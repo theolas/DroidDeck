@@ -303,7 +303,10 @@
     <string name="mode_added_none">未找到含 .exe 的游戏文件夹</string>
     <string name="mode_games_folder">游戏文件夹</string>
     <string name="mode_games_folder_another">另一个游戏文件夹</string>
-    <string name="mode_added_art">来自 Steam 的美术图</string>
+    <string name="mode_added_art">美术图</string>
+    <string name="mode_sgdb_key">SteamGridDB API 密钥</string>
+    <string name="mode_sgdb_key_yours">你的密钥</string>
+    <string name="mode_sgdb_edit">编辑…</string>
     <string name="mode_added_art_hint">按文件夹名补齐缺失的美术图。游戏文件夹中你自己的 cover.jpg、hero.jpg、logo.png 或 icon.png 优先。</string>
     <string name="mode_added_launches">启动 %1$s</string>
     <string name="mode_added_launches_in">启动 %1$s · 位于 %2$s</string>

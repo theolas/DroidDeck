@@ -303,7 +303,10 @@
     <string name="mode_added_none">.exeを含むゲームフォルダが見つかりません</string>
     <string name="mode_games_folder">ゲームフォルダ</string>
     <string name="mode_games_folder_another">別のゲームフォルダ</string>
-    <string name="mode_added_art">Steamからの画像</string>
+    <string name="mode_added_art">アートワーク</string>
+    <string name="mode_sgdb_key">SteamGridDB API キー</string>
+    <string name="mode_sgdb_key_yours">自分のキー</string>
+    <string name="mode_sgdb_edit">編集…</string>
     <string name="mode_added_art_hint">フォルダ名に基づいて不足している画像を補完します。ゲームフォルダ内のcover.jpg、hero.jpg、logo.png、またはicon.pngが優先的に使用されます。</string>
     <string name="mode_added_launches">%1$sを起動</string>
     <string name="mode_added_launches_in">%1$sを起動 · %2$s内</string>

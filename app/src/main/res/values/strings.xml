@@ -309,8 +309,11 @@
     <string name="mode_added_none">no game folders with a .exe found</string>
     <string name="mode_games_folder">Games folder</string>
     <string name="mode_games_folder_another">Another games folder</string>
-    <string name="mode_added_art">Artwork from Steam</string>
-    <string name="mode_added_art_hint">Fills in missing art by folder name. Your own cover.jpg, hero.jpg, logo.png or icon.png in the game folder takes priority.</string>
+    <string name="mode_added_art">Artwork</string>
+    <string name="mode_sgdb_key">SteamGridDB API key</string>
+    <string name="mode_sgdb_key_yours">Your key</string>
+    <string name="mode_sgdb_edit">Edit…</string>
+    <string name="mode_added_art_hint">Fills in missing art from Steam, then SteamGridDB. Your own cover.jpg, hero.jpg, logo.png or icon.png in the game folder takes priority.</string>
     <string name="mode_added_launches">Launches %1$s</string>
     <string name="mode_added_launches_in">Launches %1$s · in %2$s</string>
     <string name="mode_added_choose">Choose another file…</string>

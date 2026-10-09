@@ -273,7 +273,10 @@
     <string name="mode_added_none">Aucun dossier de jeu contenant un .exe trouvé</string>
     <string name="mode_games_folder">Dossier de jeux</string>
     <string name="mode_games_folder_another">Autre dossier de jeux</string>
-    <string name="mode_added_art">Images depuis Steam</string>
+    <string name="mode_added_art">Illustrations</string>
+    <string name="mode_sgdb_key">Clé API SteamGridDB</string>
+    <string name="mode_sgdb_key_yours">Votre clé</string>
+    <string name="mode_sgdb_edit">Modifier…</string>
     <string name="mode_added_art_hint">Complète les images manquantes selon le nom du dossier. Les fichiers cover.jpg, hero.jpg, logo.png ou icon.png dans le dossier du jeu sont prioritaires.</string>
     <string name="mode_added_launches">Lancer %1$s</string>
     <string name="mode_added_launches_in">Lancer %1$s · dans %2$s</string>
