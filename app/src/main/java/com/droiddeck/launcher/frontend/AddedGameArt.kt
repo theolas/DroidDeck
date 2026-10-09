@@ -12,8 +12,9 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Artwork for an added game: what the user put in the game's folder first, else what Steam's
- * store has for the same title, fetched once into the app's cache. Four pieces, named the way
+ * Artwork for an added game: what the user put in the game's folder first, else what Steam has
+ * for it - by the Steam appid its files name, else by a store search on its title - else what
+ * SteamGridDB has ([SteamGridDb]), fetched once into the app's cache. Four pieces, named the way
  * the client names them in its grid folder: the portrait capsule, the wide header, the hero
  * background and the logo; plus an icon pulled out of the game's own .exe. The session hands
  * the paths to the runtime's shortcuts writer, which copies them into the client's grid.
@@ -68,7 +69,7 @@ object AddedGameArt {
             header = own.header ?: cached("header.jpg"),
             hero = own.hero ?: cached("hero.jpg"),
             logo = own.logo ?: cached("logo.png"),
-            icon = own.icon ?: exeIcon(context, game),
+            icon = own.icon ?: cached("icon-sgdb.png") ?: exeIcon(context, game),
         )
     }
 
@@ -88,58 +89,93 @@ object AddedGameArt {
     }
 
     /**
-     * Looks the games up on Steam's store and fetches the art that is missing, once per game
-     * (a miss is retried after a week). Blocking: run it off the main thread. Returns true when
-     * anything new arrived.
+     * Fetches the art that is missing: Steam first (the appid the game's files name, else a store
+     * search on its title whose result carries the same name), then SteamGridDB when a key is
+     * set. Each lookup runs once per game; a miss is retried after a week. Blocking: run it off
+     * the main thread. Returns true when anything new arrived.
      */
     fun fetchMissing(context: Context, games: List<AddedGames.Game>): Boolean {
         if (!SessionPrefs.addedGamesArt(context)) return false
+        val sgdbKey = SteamGridDb.key(context)
         var changed = false
         for (game in games) {
             if (local(game).portrait != null) continue
             val cache = cacheDir(context, game)
-            val lookup = File(cache, "steam-appid")
             if (File(cache, "p.jpg").isFile) continue
-            if (lookup.isFile && (lookup.readText().trim() != "none" || System.currentTimeMillis() - lookup.lastModified() < RETRY_AFTER_MS)) {
-                val id = lookup.readText().trim()
-                if (id == "none") continue
-                if (download(id, cache)) changed = true
-                continue
-            }
             cache.mkdirs()
-            val id = runCatching { search(game.name) }.onFailure { Log.w(TAG, "${game.name}: store search failed (${it.message})") }.getOrNull()
-            if (id == null) { lookup.writeText("none"); continue }
-            lookup.writeText(id)
-            Log.i(TAG, "${game.name}: Steam app $id")
-            if (download(id, cache)) changed = true
+            val appId = runCatching { GameIdentifier.identify(game.exe).appId }.getOrNull()
+            val id = steamAppId(game.name, appId, File(cache, "steam-appid")) { name ->
+                runCatching { search(name) }.onFailure { Log.w(TAG, "${game.name}: store search failed (${it.message})") }.getOrNull()
+            }
+            if (id != null && download(id, cache)) changed = true
+            if (File(cache, "p.jpg").isFile || sgdbKey.isEmpty()) continue
+            val gridId = remembered(File(cache, "sgdb-id")) {
+                runCatching { SteamGridDb.gameId(sgdbKey, appId ?: id?.toIntOrNull(), game.name) }.getOrNull()?.toString()
+            }?.toIntOrNull() ?: continue
+            if (runCatching { SteamGridDb.download(sgdbKey, gridId, cache) }.getOrDefault(false)) changed = true
         }
         return changed
     }
 
+    /**
+     * The game's Steam appid for its art: the one its files name ([appId]) as it is, else the
+     * remembered or freshly searched one ([search] on [name]); null for none.
+     */
+    internal fun steamAppId(name: String, appId: Int?, lookup: File, search: (String) -> String?): String? {
+        if (appId != null) {
+            lookup.writeText(appId.toString())
+            Log.i(TAG, "$name: Steam app $appId (from its files)")
+            return appId.toString()
+        }
+        return remembered(lookup) { search(name)?.also { Log.i(TAG, "$name: Steam app $it") } }
+    }
+
+    /** What [marker] remembers (an id, or "none" for a week), else [find]'s answer written to it. */
+    private fun remembered(marker: File, find: () -> String?): String? {
+        if (marker.isFile) {
+            val value = marker.readText().trim()
+            if (value != "none") return value
+            if (System.currentTimeMillis() - marker.lastModified() < RETRY_AFTER_MS) return null
+        }
+        val found = find()
+        marker.writeText(found ?: "none")
+        return found
+    }
+
     private fun normalize(s: String) = s.lowercase().replace(Regex("[^a-z0-9]"), "")
 
-    /** The Steam appid whose store name matches the folder name best, or null for no match. */
+    private val EDITION = Regex("(?i)\\b(complete|definitive|legendary|goty|game of the year|deluxe|ultimate|remastered)( edition)?\\b")
+
+    /**
+     * How well a result's name [got] matches the game's [name]: 3 the same, 2 the same once
+     * edition words are dropped, 1 one starts with the other; 0 no match. Nothing is taken for
+     * being the first result.
+     */
+    internal fun nameMatch(name: String, got: String): Int {
+        val want = normalize(name)
+        val wantShort = normalize(name.replace(EDITION, " ").trim().ifEmpty { name })
+        val have = normalize(got)
+        if (have.isEmpty() || wantShort.isEmpty()) return 0
+        return when {
+            have == want -> 3
+            have == wantShort -> 2
+            have.startsWith(wantShort) || wantShort.startsWith(have) -> 1
+            else -> 0
+        }
+    }
+
+    /** The id of the store result whose name matches [name] best, or null when none does. */
+    internal fun pickStoreResult(name: String, items: List<Pair<String, String>>): String? =
+        items.map { (id, got) -> id to nameMatch(name, got) }
+            .filter { it.second > 0 && it.first.isNotEmpty() }
+            .maxByOrNull { it.second }?.first
+
+    /** The Steam appid whose store name matches [name], or null for no match. */
     private fun search(name: String): String? {
-        val term = name.replace(Regex("(?i)\\b(complete|definitive|legendary|goty|game of the year|deluxe|ultimate|remastered)( edition)?\\b"), " ").trim().ifEmpty { name }
+        val term = name.replace(EDITION, " ").trim().ifEmpty { name }
         val json = get(STORE_SEARCH + URLEncoder.encode(term, "UTF-8"))?.toString(Charsets.UTF_8) ?: return null
         val items = JSONObject(json).optJSONArray("items") ?: return null
-        val want = normalize(name)
-        val wantShort = normalize(term)
-        var best: String? = null
-        var bestScore = 0
-        for (i in 0 until items.length()) {
-            val item = items.getJSONObject(i)
-            val got = normalize(item.optString("name"))
-            val score = when {
-                got == want -> 4
-                got == wantShort -> 3
-                got.startsWith(wantShort) || wantShort.startsWith(got) -> 2
-                i == 0 -> 1
-                else -> 0
-            }
-            if (score > bestScore) { bestScore = score; best = item.optString("id") }
-        }
-        return best?.takeIf { it.isNotEmpty() && bestScore >= 1 }
+        return pickStoreResult(name, (0 until items.length()).map { items.getJSONObject(it) }.map { it.optString("id") to it.optString("name") })
     }
 
     private fun download(id: String, cache: File): Boolean {
@@ -157,7 +193,7 @@ object AddedGameArt {
         return got
     }
 
-    private fun get(url: String): ByteArray? {
+    internal fun get(url: String): ByteArray? {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 10_000
         c.readTimeout = 15_000

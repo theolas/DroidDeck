@@ -301,7 +301,10 @@
     <string name="mode_added_none">папок с играми (.exe) не найдено</string>
     <string name="mode_games_folder">Папка с играми</string>
     <string name="mode_games_folder_another">Другая папка с играми</string>
-    <string name="mode_added_art">Обложки из Steam</string>
+    <string name="mode_added_art">Обложки</string>
+    <string name="mode_sgdb_key">API-ключ SteamGridDB</string>
+    <string name="mode_sgdb_key_yours">Ваш ключ</string>
+    <string name="mode_sgdb_edit">Изменить…</string>
     <string name="mode_added_art_hint">Дополняет отсутствующие изображения по имени папки. Файлы cover.jpg, hero.jpg, logo.png или icon.png в папке с игрой имеют приоритет.</string>
     <string name="mode_added_launches">Запускает %1$s</string>
     <string name="mode_added_launches_in">Запускает %1$s · в %2$s</string>

@@ -303,7 +303,10 @@
     <string name="mode_added_none">no hay carpetas de juegos con un .exe</string>
     <string name="mode_games_folder">Carpeta de juegos</string>
     <string name="mode_games_folder_another">Otra carpeta de juegos</string>
-    <string name="mode_added_art">Imágenes de Steam</string>
+    <string name="mode_added_art">Ilustraciones</string>
+    <string name="mode_sgdb_key">Clave API de SteamGridDB</string>
+    <string name="mode_sgdb_key_yours">Tu clave</string>
+    <string name="mode_sgdb_edit">Editar…</string>
     <string name="mode_added_art_hint">Completa las imágenes que faltan según el nombre de la carpeta. Tus propios cover.jpg, hero.jpg, logo.png o icon.png en la carpeta del juego tienen prioridad.</string>
     <string name="mode_added_launches">Inicia %1$s</string>
     <string name="mode_added_launches_in">Inicia %1$s · en %2$s</string>

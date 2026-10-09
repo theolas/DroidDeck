@@ -7,7 +7,7 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
 
 ---
 
-## 2026-10-09 - `feat/added-games-remove`: remove an added game; exe picker and game titles
+## 2026-10-09 - `feat/added-games-remove`: remove an added game; exe picker, game titles, art
 
 - **Remove:** Steam settings › Games lists each added game with its exe box; a red X beside it
   (press, it fills red with "Remove?", press again within four seconds) stops listing the game:
@@ -31,7 +31,24 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
   when the disk gives one, else its folder name. Its shortcut appid is stored per folder at the
   first scan, so a title found later renames the shortcut without moving its id (grid art,
   prefix, saves stay); a rename made in Steam is kept by the shortcuts writer as before.
-- **Tests:** `AddedGamesCandidatesTest` (Unreal three down over helpers, five down found and six
+- **Art (`AddedGameArt`):** Steam first - the appid the game's files name (`steam_appid.txt`,
+  emulator ini, appmanifest) straight to the CDN, no search; else a store search on the game's
+  title that is taken only when a result's name matches (same, same without edition words, or one
+  a prefix of the other; the old "first result counts" rule is gone). Then SteamGridDB
+  (`SteamGridDb`) when a key is set: by Steam appid (`/games/steam/{id}`) else a name-matched
+  autocomplete result; best-scored 600x900 grid, 460x215/920x430 grid, hero, logo, icon
+  (`nsfw=false&humor=false`), into the same cache names (icon as `icon-sgdb.png`, ahead of the exe
+  icon). Same once-per-game rule, misses retried after a week. The switch is now "Artwork".
+- **SteamGridDB key:** Steam settings › Games › "SteamGridDB API key" (Edit… opens a masked
+  field; the saved key is never shown back): the user's key, sealed with `CredentialCipher` in
+  `files/sgdb/key.json`, wins over `BuildConfig.SGDB_API_KEY`; no key, no SteamGridDB step. The
+  app reads the build field by name, so it builds and runs before the field exists: the
+  `buildConfigField` line in `app/build.gradle` and the secret in the workflow's build step are
+  the build owner's to add. The key goes only in the Authorization header; request failures log
+  the URL path, never headers.
+- **Tests:** `AddedGameArtLookupTest` (appid used without a search, a week between searches, no
+  blind first match on Steam or SteamGridDB, best-scored image, key precedence, the key sealed and
+  cleared), `AddedGamesCandidatesTest` (Unreal three down over helpers, five down found and six
   not, skip folders, the walk budget, a launcher below the game, uncertain marking, a pick kept, a
   deep exe starting in its own folder, the identified title with the id unchanged, a cleaned file
   name keeping the folder name), `GameIdentifierTest` (ported).
