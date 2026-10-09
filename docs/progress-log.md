@@ -18,8 +18,12 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
   menu that restores any of them (the shortcut returns at the next session start). Store installs
   have no button. Tests: `AddedGamesRemoveTest`.
 - **+ on the Games tab:** a round + beside "Games N" (also on the empty and one-game pages, not in
-  the shortcut picker) opens the in-app file picker on .exe files, at the last folder picked in,
-  else the first Games folder, else internal storage. The pick is the whole flow
+  the shortcut picker) opens a compact dialog (`ExePickerDialog`, the Install dialog's shell: 440
+  dp, "Add a game:" and Cancel on one line): storage rows (Internal storage, each card, free
+  space), then a breadcrumb, "..", folders and .exe files (name, size) scrolling inside, up to 70%
+  of the screen. B / Back goes up a folder and closes from the storage rows. Setup's "Choose
+  another file…" opens the same dialog at the game's folder, titled "Pick the exe:". The pick is
+  the whole flow
   (`AddedGames.addExe`): the game it already is gets selected; an exe inside a listed or removed
   game's folder switches that game's exe; otherwise its folder becomes a game of its own
   (`AddedExes`, `files/added-exes.json`: folder and first exe), named by `GameIdentifier` (else

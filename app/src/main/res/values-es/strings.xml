@@ -315,6 +315,8 @@
     <string name="mode_added_remove_confirm">¿Quitar?</string>
     <string name="mode_added_removed">Juegos quitados (%1$d)</string>
     <string name="games_add">Añadir juego</string>
+    <string name="games_add_title">Añadir un juego:</string>
+    <string name="games_pick_exe_title">Elige el exe:</string>
     <string name="games_add_unreachable">Esta ubicación no está disponible en la sesión</string>
     <string name="mode_added_exe_check">Revisa este .exe</string>
     <string name="mode_added_exe_note">Por defecto, el .exe con el nombre de la carpeta o, si no, el más grande.</string>
@@ -1149,7 +1151,6 @@
     <string name="main_forgetting_named">Olvidando %1$s…</string>
     <string name="main_pick_game_storage">Elige la carpeta de almacenamiento de juegos</string>
     <string name="main_pick_added_games">Elige una carpeta con tus propios juegos</string>
-    <string name="main_pick_game_exe">Elige el .exe del juego</string>
     <string name="main_pick_decky_zip">Elige un ZIP de plugin de Decky</string>
     <string name="main_storage_not_usable">No se puede usar: %1$s</string>
 

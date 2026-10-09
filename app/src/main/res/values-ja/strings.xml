@@ -315,6 +315,8 @@
     <string name="mode_added_remove_confirm">削除？</string>
     <string name="mode_added_removed">削除したゲーム（%1$d）</string>
     <string name="games_add">ゲームを追加</string>
+    <string name="games_add_title">ゲームを追加:</string>
+    <string name="games_pick_exe_title">exe を選択:</string>
     <string name="games_add_unreachable">この場所はセッションから使えません</string>
     <string name="mode_added_exe_check">この exe を確認</string>
     <string name="mode_added_exe_note">デフォルトではフォルダと同じ名前の.exeを使用し、ない場合は最大の.exeを使用します。</string>
@@ -1133,7 +1135,6 @@
     <string name="main_forgetting_named">%1$sを登録解除中…</string>
     <string name="main_pick_game_storage">ゲームの保存先フォルダを選択</string>
     <string name="main_pick_added_games">自分のゲームがあるフォルダを選択</string>
-    <string name="main_pick_game_exe">ゲームの.exeを選択</string>
     <string name="main_pick_decky_zip">Deckyプラグインのzipを選択</string>
     <string name="main_storage_not_usable">使用できません：%1$s</string>
 

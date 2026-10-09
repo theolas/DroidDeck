@@ -315,6 +315,8 @@
     <string name="mode_added_remove_confirm">移除？</string>
     <string name="mode_added_removed">已移除的遊戲（%1$d）</string>
     <string name="games_add">新增遊戲</string>
+    <string name="games_add_title">新增遊戲：</string>
+    <string name="games_pick_exe_title">選擇 exe：</string>
     <string name="games_add_unreachable">工作階段無法存取此位置</string>
     <string name="mode_added_exe_check">請檢查此 exe</string>
     <string name="mode_added_exe_note">預設使用與資料夾同名的 .exe，否則使用最大的 .exe。</string>
@@ -1133,7 +1135,6 @@
     <string name="main_forgetting_named">正在忘記 %1$s…</string>
     <string name="main_pick_game_storage">選擇遊戲儲存資料夾</string>
     <string name="main_pick_added_games">選擇存放你自己遊戲的資料夾</string>
-    <string name="main_pick_game_exe">選擇遊戲的 .exe</string>
     <string name="main_pick_decky_zip">選擇 Decky 外掛程式 ZIP</string>
     <string name="main_storage_not_usable">無法使用：%1$s</string>
 

@@ -172,7 +172,6 @@ class ModeSettingsActions(
     val onAddedGameExe: (folderPath: String, path: String) -> Unit = { _, _ -> },
     val onRemoveAddedGame: (folderPath: String) -> Unit = {},
     val onRestoreAddedGame: (folderPath: String) -> Unit = {},
-    val onPickAddedGameExe: (folderPath: String) -> Unit = {},
     val onDeckyInstall: (DeckyManager.Release) -> Unit = {},
     val onDeckyCheck: () -> Unit = {},
     val onDeckyEnabled: (Boolean) -> Unit = {},
@@ -197,6 +196,7 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
     var confirmDeckyRemoval by remember { mutableStateOf(false) }
     var explainWifiDiscovery by remember { mutableStateOf(false) }
     var editSgdbKey by remember { mutableStateOf(false) }
+    var pickExeFor by remember { mutableStateOf<String?>(null) }
     var tabIndex by androidx.compose.runtime.saveable.rememberSaveable(s.mode) { mutableStateOf(0) }
     val tabs = if (steam) ModeSettingsTab.entries else listOf(
         ModeSettingsTab.DISPLAY, ModeSettingsTab.CONTROLS, ModeSettingsTab.SESSION,
@@ -471,7 +471,7 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
                     host, "added:" + g.folderPath, g.folderName, if (s.addedGamesDirs.size > 1) stringResource(R.string.mode_added_launches_in, g.exeName, g.folderPath.substringBeforeLast('/').substringAfterLast('/')) else stringResource(R.string.mode_added_launches, g.exeName),
                     g.candidates + ("__pick__" to stringResource(R.string.mode_added_choose)), g.exePath,
                     note = stringResource(R.string.mode_added_exe_note),
-                    onPick = { path -> if (path == "__pick__") a.onPickAddedGameExe(g.folderPath) else a.onAddedGameExe(g.folderPath, path) },
+                    onPick = { path -> if (path == "__pick__") pickExeFor = g.folderPath else a.onAddedGameExe(g.folderPath, path) },
                     trailing = if (g.removable || g.uncertain) ({
                         if (g.uncertain) UncertainMark(stringResource(R.string.mode_added_exe_check))
                         if (g.removable) RemoveButton(stringResource(R.string.mode_added_remove, g.folderName)) { a.onRemoveAddedGame(g.folderPath) }
@@ -553,6 +553,9 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
                 onChange = a.onStorageDiagnostics,
             )
         }
+    }
+    pickExeFor?.let { folder ->
+        ExePickerDialog(stringResource(R.string.games_pick_exe_title), start = java.io.File(folder), onPick = { a.onAddedGameExe(folder, it.path) }, onDismiss = { pickExeFor = null })
     }
     if (editSgdbKey) SgdbKeyDialog(s.sgdbUserKey, onSave = { a.onSgdbKey(it); editSgdbKey = false }, onDismiss = { editSgdbKey = false })
     if (explainWifiDiscovery) AlertDialog(
