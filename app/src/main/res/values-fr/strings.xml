@@ -284,6 +284,8 @@
     <string name="mode_added_remove">Retirer %1$s</string>
     <string name="mode_added_remove_confirm">Retirer ?</string>
     <string name="mode_added_removed">Jeux retirés (%1$d)</string>
+    <string name="games_add">Ajouter un jeu</string>
+    <string name="games_add_unreachable">Cet emplacement n’est pas disponible dans la session</string>
     <string name="mode_added_exe_check">Vérifier cet exécutable</string>
     <string name="mode_added_exe_note">Utilise par défaut le .exe portant le même nom que le dossier, sinon le .exe le plus volumineux.</string>
     <string name="mode_stretch169">Étirer les jeux 16:9</string>

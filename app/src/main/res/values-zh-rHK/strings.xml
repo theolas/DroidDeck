@@ -314,6 +314,8 @@
     <string name="mode_added_remove">移除 %1$s</string>
     <string name="mode_added_remove_confirm">移除？</string>
     <string name="mode_added_removed">已移除的遊戲（%1$d）</string>
+    <string name="games_add">加入遊戲</string>
+    <string name="games_add_unreachable">工作階段無法存取此位置</string>
     <string name="mode_added_exe_check">請檢查此 exe</string>
     <string name="mode_added_exe_note">預設使用與資料夾同名的 .exe，否則使用最大的 .exe。</string>
     <string name="wincomp_title">Windows 組件</string>

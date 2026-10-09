@@ -7,7 +7,7 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
 
 ---
 
-## 2026-10-09 - `feat/added-games-remove`: remove an added game; exe picker, game titles, art
+## 2026-10-09 - `feat/added-games-remove`: add a game from its exe, remove one; exe picker, titles, art
 
 - **Remove:** Steam settings › Games lists each added game with its exe box; a red X beside it
   (press, it fills red with "Remove?", press again within four seconds) stops listing the game:
@@ -17,6 +17,18 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
   folders, so a rescan does not bring them back; "Removed games (N)" at the end of the list opens a
   menu that restores any of them (the shortcut returns at the next session start). Store installs
   have no button. Tests: `AddedGamesRemoveTest`.
+- **+ on the Games tab:** a round + beside "Games N" (also on the empty and one-game pages, not in
+  the shortcut picker) opens the in-app file picker on .exe files, at the last folder picked in,
+  else the first Games folder, else internal storage. The pick is the whole flow
+  (`AddedGames.addExe`): the game it already is gets selected; an exe inside a listed or removed
+  game's folder switches that game's exe; otherwise its folder becomes a game of its own
+  (`AddedExes`, `files/added-exes.json`: folder and first exe), named by `GameIdentifier` (else
+  the folder), registered like added folders (listing rewrite, live add to a running client),
+  appid stored at the first scan, listed in Steam settings › Games with the exe box, "?" and X,
+  and selected on the Games tab. The session must see the path: Games folders, the Steam library
+  card, store roots, the runtime tree, and now internal storage anywhere (`/root/Storage`, bound in
+  every session); elsewhere (a card not otherwise bound) the pick is refused with one line.
+  Tests: `AddedExesTest`.
 - **Exe picker (ported from Bannerlator's `GameFolderScanner`):** `GameExePicker` walks up to five
   folders below the game folder (Bannerlator: four), nearest levels first, at most 400 entries,
   never through symlinks, past installer / redistributable / extras folders (plus `DotNet*`,

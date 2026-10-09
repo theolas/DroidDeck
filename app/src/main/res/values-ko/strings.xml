@@ -314,6 +314,8 @@
     <string name="mode_added_remove">%1$s 제거</string>
     <string name="mode_added_remove_confirm">제거?</string>
     <string name="mode_added_removed">제거한 게임 (%1$d)</string>
+    <string name="games_add">게임 추가</string>
+    <string name="games_add_unreachable">이 위치는 세션에서 사용할 수 없습니다</string>
     <string name="mode_added_exe_check">이 exe 확인</string>
     <string name="mode_added_exe_note">기본적으로 폴더와 이름이 같은 .exe를 사용하고, 없으면 가장 큰 .exe를 사용합니다.</string>
     <string name="wincomp_title">Windows 구성 요소</string>

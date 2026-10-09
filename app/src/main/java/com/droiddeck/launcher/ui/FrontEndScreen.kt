@@ -151,6 +151,8 @@ class FrontEndActions(
     val onGameShortcut: (Library.SteamGame) -> Unit = {},
     val onExportGameFile: (Library.SteamGame) -> Unit = {},
     val onSyncGameFiles: () -> Unit = {},
+    /** The Games tab's +: pick an .exe and add it as a game. */
+    val onAddGameExe: () -> Unit = {},
     val onStopGameFileSync: () -> Unit = {},
     val onCopyGameLink: (Library.SteamGame) -> Unit = {},
     val onDesktop: () -> Unit,

@@ -320,6 +320,41 @@ class MainActivity : ComponentActivity() {
             refresh()
         }
     }
+    /** The Games tab's +: the picked .exe becomes a game (or selects / switches the one it belongs to). */
+    private val pickNewGameExe = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+        val path = InAppFilePicker.pickedPath(r.data) ?: return@registerForActivityResult
+        val exe = java.io.File(path)
+        exe.parentFile?.let { SessionPrefs.setLastExePickDir(this, it.path) }
+        Thread({
+            val result = try { com.droiddeck.launcher.frontend.AddedGames.addExe(this, exe) } catch (e: Exception) {
+                Log.w(TAG, "add game: ${e.message}"); com.droiddeck.launcher.frontend.AddedGames.AddResult.NotFound
+            }
+            val game = when (result) {
+                is com.droiddeck.launcher.frontend.AddedGames.AddResult.Added -> result.game
+                is com.droiddeck.launcher.frontend.AddedGames.AddResult.Existing -> result.game
+                is com.droiddeck.launcher.frontend.AddedGames.AddResult.Switched -> result.game
+                else -> null
+            }
+            ui.post {
+                if (game == null) {
+                    if (result is com.droiddeck.launcher.frontend.AddedGames.AddResult.Unreachable)
+                        android.widget.Toast.makeText(this, R.string.games_add_unreachable, android.widget.Toast.LENGTH_LONG).show()
+                    return@post
+                }
+                refreshAddedGames()
+                refresh()
+                navRequest = "app:${game.steamAppId ?: game.appId.toInt()}"
+            }
+        }, "add-game-exe").start()
+    }
+
+    private fun pickNewGame() {
+        val start = SessionPrefs.lastExePickDir(this).takeIf { java.io.File(it).isDirectory }
+            ?: addedGamesDirs.firstOrNull { java.io.File(it).isDirectory }
+            ?: android.os.Environment.getExternalStorageDirectory().path
+        pickNewGameExe.launch(InAppFilePicker.buildIntent(this, listOf("exe"), getString(R.string.main_pick_game_exe), start))
+    }
     private var addedGamesDirs by mutableStateOf<List<String>>(emptyList())
     private var addedGamesArt by mutableStateOf(true)
     @Volatile private var artFetchRunning = false
@@ -611,6 +646,7 @@ class MainActivity : ComponentActivity() {
                         onGameShortcut = { g -> com.droiddeck.launcher.frontend.GameShortcuts.pin(this, g) },
                         onExportGameFile = { g -> pickGameExport(g) },
                         onSyncGameFiles = { pickGameExport(null) },
+                        onAddGameExe = { pickNewGame() },
                         onStopGameFileSync = {
                             Thread({
                                 GameFileSync.disable(this)
