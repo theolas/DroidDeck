@@ -88,6 +88,9 @@ object AddedGames {
         // root/Games/Stores): the tree is the session's / and needs no bind.
         val runtime = LinuxRuntime.rootDir(context).absolutePath
         if (path.startsWith("$runtime/")) return "/" + path.removePrefix("$runtime/")
+        // Internal storage, bound at /root/Storage in every session: an exe picked anywhere on it.
+        val storage = android.os.Environment.getExternalStorageDirectory().absolutePath
+        if (path.startsWith("$storage/")) return "/root/Storage/" + path.removePrefix("$storage/")
         return null
     }
 
@@ -137,6 +140,12 @@ object AddedGames {
                 scanGame(context, folder, out)
             }
         }
+        // Games added as one picked exe (the Games tab's +), by that exe's folder.
+        for (entry in AddedExes.list(context)) {
+            val folder = File(entry.folder)
+            if (folder.path in removed || !folder.isDirectory) continue
+            scanGame(context, folder, out, single = File(entry.exe))
+        }
         // Games the Stores section installed: one folder each under <root>/<Store>/, with a sidecar.
         // An unfinished one (sidecar still `installing`, or none at all) is neither a game nor Custom.
         for (folder in StoreInstallRoot.gameFolders(context)) if (StoreInstallRoot.isFinished(folder)) scanGame(context, folder, out)
@@ -154,6 +163,47 @@ object AddedGames {
         com.droiddeck.launcher.stores.StoreInstalls.register(app)
         if (appId != null) com.droiddeck.launcher.stores.SteamLiveShortcuts.remove(app, appId)
         Log.i(TAG, "removed ${folder.name} from the added games")
+    }
+
+    /** What [addExe] did with a picked exe. */
+    sealed class AddResult {
+        /** A new game, or the existing one the exe already is, or the listed game whose exe it now is. */
+        class Added(val game: Game) : AddResult()
+        class Existing(val game: Game) : AddResult()
+        class Switched(val game: Game) : AddResult()
+        /** The session cannot see the exe's path. */
+        object Unreachable : AddResult()
+        object NotFound : AddResult()
+    }
+
+    private fun canonical(f: File): String = runCatching { f.canonicalPath }.getOrDefault(f.absolutePath)
+
+    private fun inside(path: String, folder: String) = path.startsWith(folder.trimEnd('/') + "/")
+
+    /**
+     * Adds the game [exe] is: the game itself when it is listed already, that game's exe switched
+     * when [exe] sits in a listed (or removed) game's folder, else a new game for [exe]'s folder,
+     * registered with Steam as added folders are (the listing, and the running client). Nothing
+     * is added when the session cannot see the path. Blocking.
+     */
+    fun addExe(context: Context, exe: File): AddResult {
+        val app = context.applicationContext
+        if (!exe.isFile) return AddResult.NotFound
+        val path = canonical(exe)
+        val games = scan(app)
+        games.firstOrNull { canonical(it.exe) == path }?.let { return AddResult.Existing(it) }
+        val owner = games.firstOrNull { inside(path, canonical(it.folder)) }?.folder
+            ?: SessionPrefs.removedAddedGames(app).map { File(it) }.firstOrNull { inside(path, canonical(it)) }
+        if (owner == null && guestPath(app, exe) == null) return AddResult.Unreachable
+        val folder = owner ?: exe.parentFile ?: return AddResult.NotFound
+        SessionPrefs.setAddedGameRemoved(app, folder.path, false)
+        SessionPrefs.setAddedGameExe(app, folder.path, exe.path)
+        if (owner == null) AddedExes.put(app, AddedExes.Entry(folder.path, exe.path))
+        com.droiddeck.launcher.stores.StoreInstalls.register(app)
+        val game = scan(app).firstOrNull { it.folder.path == folder.path } ?: return AddResult.NotFound
+        com.droiddeck.launcher.stores.SteamLiveShortcuts.sync(app, listOf(game)) { true }
+        Log.i(TAG, "added ${game.name} from its exe")
+        return if (owner == null) AddResult.Added(game) else AddResult.Switched(game)
     }
 
     /** Lists a removed game again; Steam gets its shortcut from the listing at the next session start. Blocking. */
@@ -181,14 +231,15 @@ object AddedGames {
 
     private val INSTALL_DIR = Regex("\"installdir\"\\s*\"([^\"]*)\"", RegexOption.IGNORE_CASE)
 
-    private fun scanGame(context: Context, folder: File, out: MutableList<Game>) {
+    /** [single]: the exe a game added on its own was picked as, standing in when no other is chosen. */
+    private fun scanGame(context: Context, folder: File, out: MutableList<Game>, single: File? = null) {
         run {
             // A store install carries a sidecar; every one of them is a shortcut.
             val sidecar = StoreGameSidecar.read(folder)
             val ranking = rank(folder)
             val candidates = ranking.exes
             val picked = SessionPrefs.addedGameExe(context, folder.path)
-            val chosen = picked.takeIf { it.isNotEmpty() }?.let { File(it) }?.takeIf { it.isFile }
+            val chosen = picked.takeIf { it.isNotEmpty() }?.let { File(it) }?.takeIf { it.isFile } ?: single?.takeIf { it.isFile }
             // A store install says which exe it is; the folder's guess only when that file is gone.
             val found = chosen ?: sidecar?.exeFile(folder)?.takeIf { it.isFile } ?: candidates.firstOrNull() ?: return
             // The store's launcher .bat stands in front of the exe when the game needs arguments or
@@ -198,7 +249,8 @@ object AddedGames {
             if (foundGuest == null) { Log.w(TAG, "${folder.name}: the session cannot see ${launch.path}"); return }
             // A store install's title; else the title the disk gives (the shortcut's appid is kept
             // per folder from its first scan, so a name found later does not move it); else the folder.
-            val name = sidecar?.title ?: identifiedName(folder, found) ?: folder.name
+            val name = sidecar?.title ?: identifiedName(folder, found)
+                ?: single?.let { runCatching { GameIdentifier.identify(found).name }.getOrNull() } ?: folder.name
             // Keyed by the pre-rename path so shortcut ids, and the prefixes and saves under them, stay put.
             val crc = CRC32().apply { update(("\"${foundGuest.replaceFirst(Regex("^$LIBRARY/"), "$LEGACY_LIBRARY/")}\"" + name).toByteArray()) }.value
             val appId = SessionPrefs.addedGameAppId(context, folder.path, crc or 0x80000000L)

@@ -36,9 +36,9 @@ object SteamLiveShortcuts {
     private const val TAG_NAME = "droiddeck-app"
     private const val COMPAT_TOOL = "droiddeck-proton-arm64"
 
-    /** Adds every store game in [games] the client does not list yet. Blocking; worker thread. */
-    fun sync(context: Context, games: List<AddedGames.Game>) {
-        val wanted = games.filter { it.source != Library.ADDED }
+    /** Adds every game in [games] that [include] takes (store games by default) and the client does not list yet. Blocking; worker thread. */
+    fun sync(context: Context, games: List<AddedGames.Game>, include: (AddedGames.Game) -> Boolean = { it.source != Library.ADDED }) {
+        val wanted = games.filter(include)
         if (wanted.isEmpty() || !clientRunning()) return
         val list = JSONArray()
         for (g in wanted) list.put(JSONObject().put("name", g.name).put("exe", g.guestExe).put("dir", g.guestDir))
