@@ -33,6 +33,8 @@ object AddedGames {
         val source: String = Library.ADDED,
         /** The store's own id for the game, from its sidecar; null for a plain added folder. */
         val storeId: String? = null,
+        /** The exe is the picker's guess and nothing clearly won ([GameExePicker.Ranking.uncertain]). */
+        val exeUncertain: Boolean = false,
     ) {
         fun folderName(): String = folder.name
     }
@@ -89,71 +91,32 @@ object AddedGames {
         return null
     }
 
-    /** How far below a game folder its .exe files are looked for (an Unreal game's sits three down). */
-    internal const val EXE_DEPTH = 5
+    /** The .exe files a game folder offers, best first ([GameExePicker]); also what its exe box lists, in that order. */
+    fun candidates(folder: File): List<File> = rank(folder).exes
 
-    /** Folders and .exe files looked at per game before the walk stops, so a huge game stays quick. */
-    internal const val EXE_WALK_BUDGET = 400
-
-    /** Folders that hold installers, redistributables and tools, never the game. */
-    private val SKIP_DIR = Regex("(?i)^(_?commonredist|redist|directx|dotnet.*|vcredist.*|prerequisites|support|__installer|installers|\\.git|\\$.*)$")
-    private val SKIP_PATH = listOf("engine/extras", "engine/binaries/thirdparty")
-
-    private fun skipDir(dir: File, relative: String): Boolean {
-        if (SKIP_DIR.matches(dir.name)) return true
-        val rel = relative.lowercase()
-        return SKIP_PATH.any { rel == it || rel.endsWith("/$it") }
-    }
-
-    private fun isLink(f: File): Boolean = runCatching { java.nio.file.Files.isSymbolicLink(f.toPath()) }.getOrDefault(false)
+    /** [GameExePicker]'s ranking of [folder], without the names this list never offers. */
+    fun rank(folder: File): GameExePicker.Ranking = GameExePicker.rank(folder) { !SKIP.matches(it.name) }
 
     /**
-     * The .exe files a game folder offers, best first: up to [EXE_DEPTH] folders down, nearest
-     * levels first, at most [EXE_WALK_BUDGET] entries, past installer and redistributable folders
-     * and symlinks. Ranked: in the game folder itself, named after the folder, an Unreal build's
-     * `Binaries/Win64` (`*-Shipping.exe` or named after the folder), shallower, larger.
+     * Names identified from an exe (Steam manifest, GOG info, version resource), by the exe's path,
+     * size and time and its game folder's time (a GOG info file dropped in changes the latter).
      */
-    fun candidates(folder: File): List<File> {
-        val found = ArrayList<Pair<File, Int>>()
-        var visited = 0
-        var level = listOf(folder)
-        var depth = 0
-        walk@ while (level.isNotEmpty()) {
-            val next = ArrayList<File>()
-            for (dir in level) {
-                val entries = dir.listFiles()?.sortedBy { it.name.lowercase() } ?: continue
-                for (f in entries) {
-                    if (visited >= EXE_WALK_BUDGET) break@walk
-                    if (isLink(f)) continue
-                    if (f.isDirectory) {
-                        visited++
-                        if (depth + 1 <= EXE_DEPTH && !skipDir(f, f.relativeTo(folder).invariantSeparatorsPath)) next.add(f)
-                    } else if (f.isFile && f.name.endsWith(".exe", ignoreCase = true)) {
-                        visited++
-                        if (!SKIP.matches(f.name)) found.add(f to depth)
-                    }
-                }
-            }
-            level = next
-            depth++
-        }
-        val key = norm(folder.name)
-        val named = { f: File -> norm(f.nameWithoutExtension).let { n -> n.isNotEmpty() && (n == key || key.startsWith(n) || n.startsWith(key)) } }
-        val unreal = { f: File ->
-            val parent = f.parentFile
-            parent?.name.equals("Win64", ignoreCase = true) && parent?.parentFile?.name.equals("Binaries", ignoreCase = true) &&
-                (f.nameWithoutExtension.endsWith("-Shipping", ignoreCase = true) || norm(f.nameWithoutExtension).startsWith(key))
-        }
-        return found.sortedWith(
-            compareByDescending<Pair<File, Int>> { it.first.parentFile == folder }
-                .thenByDescending { named(it.first) }
-                .thenByDescending { unreal(it.first) }
-                .thenBy { it.second }
-                .thenByDescending { it.first.length() },
-        ).map { it.first }
-    }
+    private val identified = java.util.concurrent.ConcurrentHashMap<String, String>()
 
-    private fun norm(name: String): String = name.lowercase().replace(Regex("[^a-z0-9]"), "")
+    /**
+     * The game's own title for [exe] when the disk names one ([GameIdentifier]: a Steam manifest,
+     * a GOG info file, the exe's version resource), else null (the folder name stands).
+     */
+    internal fun identifiedName(folder: File, exe: File): String? {
+        val key = "${exe.path}|${exe.length()}|${exe.lastModified()}|${folder.lastModified()}"
+        identified[key]?.let { return it.ifEmpty { null } }
+        val id = runCatching { GameIdentifier.identify(exe) }.getOrNull()
+        val name = id?.name?.takeIf {
+            id.nameSource in setOf(GameIdentifier.Source.STEAM_MANIFEST_ACF, GameIdentifier.Source.GOG_INFO, GameIdentifier.Source.PE_VERSION)
+        }
+        identified[key] = name.orEmpty()
+        return name
+    }
 
     fun scan(context: Context): List<Game> {
         val out = ArrayList<Game>()
@@ -222,7 +185,8 @@ object AddedGames {
         run {
             // A store install carries a sidecar; every one of them is a shortcut.
             val sidecar = StoreGameSidecar.read(folder)
-            val candidates = candidates(folder)
+            val ranking = rank(folder)
+            val candidates = ranking.exes
             val picked = SessionPrefs.addedGameExe(context, folder.path)
             val chosen = picked.takeIf { it.isNotEmpty() }?.let { File(it) }?.takeIf { it.isFile }
             // A store install says which exe it is; the folder's guess only when that file is gone.
@@ -232,7 +196,9 @@ object AddedGames {
             val launch = if (chosen == null) sidecar?.launcherFile(folder)?.takeIf { it.isFile } ?: found else found
             val foundGuest = guestPath(context, launch)
             if (foundGuest == null) { Log.w(TAG, "${folder.name}: the session cannot see ${launch.path}"); return }
-            val name = sidecar?.title ?: folder.name
+            // A store install's title; else the title the disk gives (the shortcut's appid is kept
+            // per folder from its first scan, so a name found later does not move it); else the folder.
+            val name = sidecar?.title ?: identifiedName(folder, found) ?: folder.name
             // Keyed by the pre-rename path so shortcut ids, and the prefixes and saves under them, stay put.
             val crc = CRC32().apply { update(("\"${foundGuest.replaceFirst(Regex("^$LIBRARY/"), "$LEGACY_LIBRARY/")}\"" + name).toByteArray()) }.value
             val appId = SessionPrefs.addedGameAppId(context, folder.path, crc or 0x80000000L)
@@ -248,7 +214,8 @@ object AddedGames {
             val steamId = config?.let { steamRoute(it, appId) }
             out.add(Game(folder, name, exe, guestExe, guestDir, appId,
                 steamId?.toLong() ?: ((appId shl 32) or 0x02000000L), candidates, steamId,
-                source = sidecar?.store?.id ?: Library.ADDED, storeId = sidecar?.id))
+                source = sidecar?.store?.id ?: Library.ADDED, storeId = sidecar?.id,
+                exeUncertain = sidecar == null && chosen == null && adopted == null && ranking.uncertain))
         }
     }
 

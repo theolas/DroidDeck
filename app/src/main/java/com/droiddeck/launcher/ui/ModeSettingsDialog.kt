@@ -127,6 +127,8 @@ class AddedGameRow(
     val folderPath: String, val folderName: String, val exePath: String, val exeName: String, val candidates: List<Pair<String, String>>,
     /** A folder the user added (a store install is removed from its store's page instead). */
     val removable: Boolean = true,
+    /** The exe is the app's guess and nothing clearly won. */
+    val uncertain: Boolean = false,
 )
 
 class ModeSettingsActions(
@@ -461,7 +463,10 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
                     g.candidates + ("__pick__" to stringResource(R.string.mode_added_choose)), g.exePath,
                     note = stringResource(R.string.mode_added_exe_note),
                     onPick = { path -> if (path == "__pick__") a.onPickAddedGameExe(g.folderPath) else a.onAddedGameExe(g.folderPath, path) },
-                    trailing = if (g.removable) ({ RemoveButton(stringResource(R.string.mode_added_remove, g.folderName)) { a.onRemoveAddedGame(g.folderPath) } }) else null,
+                    trailing = if (g.removable || g.uncertain) ({
+                        if (g.uncertain) UncertainMark(stringResource(R.string.mode_added_exe_check))
+                        if (g.removable) RemoveButton(stringResource(R.string.mode_added_remove, g.folderName)) { a.onRemoveAddedGame(g.folderPath) }
+                    }) else null,
                 )
             }
             if (s.removedAddedGames.isNotEmpty()) MenuRow(

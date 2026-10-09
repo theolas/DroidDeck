@@ -309,6 +309,7 @@
     <string name="mode_added_remove">Убрать %1$s</string>
     <string name="mode_added_remove_confirm">Убрать?</string>
     <string name="mode_added_removed">Убранные игры (%1$d)</string>
+    <string name="mode_added_exe_check">Проверьте этот exe</string>
     <string name="mode_added_exe_note">По умолчанию используется .exe с именем папки, иначе самый большой .exe.</string>
     <string name="mode_stretch169">Растянуть игры 16:9</string>
     <string name="mode_stretch169_hint">На экранах уже 16:9 растягивает игры на весь экран вместо черных полос. Вступит в силу в следующей сессии.</string>

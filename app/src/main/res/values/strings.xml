@@ -317,6 +317,7 @@
     <string name="mode_added_remove">Remove %1$s</string>
     <string name="mode_added_remove_confirm">Remove?</string>
     <string name="mode_added_removed">Removed games (%1$d)</string>
+    <string name="mode_added_exe_check">Check this exe</string>
     <string name="mode_added_exe_note">Defaults to the .exe named after the folder, or else the largest.</string>
     <string name="wincomp_title">Windows components</string>
     <string name="wincomp_pad_hint">LB / RB jump between the sections.</string>

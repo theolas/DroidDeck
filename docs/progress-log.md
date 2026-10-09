@@ -7,23 +7,34 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
 
 ---
 
-## 2026-10-09 - `feat/added-games-remove`: remove an added game; deeper .exe search
+## 2026-10-09 - `feat/added-games-remove`: remove an added game; exe picker and game titles
 
-- **Remove:** Steam settings › Games lists each added game with its exe box; a trash-can button
-  beside it (press, it turns red with "Remove?", press again within four seconds) stops listing
-  the game: `AddedGames.remove` records the folder path (`SessionPrefs.removedAddedGames`), rewrites
-  the listing the shortcuts writer reads (`StoreInstalls.register`) and asks a running client to
-  drop the shortcut (`SteamLiveShortcuts.remove`). Nothing on disk is deleted. A scan skips removed
+- **Remove:** Steam settings › Games lists each added game with its exe box; a red X beside it
+  (press, it fills red with "Remove?", press again within four seconds) stops listing the game:
+  `AddedGames.remove` records the folder path (`SessionPrefs.removedAddedGames`), rewrites the
+  listing the shortcuts writer reads (`StoreInstalls.register`) and asks a running client to drop
+  the shortcut (`SteamLiveShortcuts.remove`). Nothing on disk is deleted. A scan skips removed
   folders, so a rescan does not bring them back; "Removed games (N)" at the end of the list opens a
   menu that restores any of them (the shortcut returns at the next session start). Store installs
   have no button. Tests: `AddedGamesRemoveTest`.
-- **Deeper .exe search:** `AddedGames.candidates` looks up to five folders below the game folder
-  (was one), nearest levels first, at most 400 folders/.exe files per game, never through symlinks,
-  past installer and redistributable folders (`_CommonRedist`, `Redist`, `DirectX`, `DotNet*`,
-  `vcredist*`, `Prerequisites`, `Support`, `Engine/Extras`, `Engine/Binaries/ThirdParty`,
-  `__Installer`, `Installers`, `.git`, `$*`). Ranked: in the game folder, named after it, an Unreal
-  `Binaries/Win64` build (`*-Shipping.exe` or named after the folder), shallower, larger. A picked
-  exe still wins; a deep exe starts in its own folder. Tests: `AddedGamesCandidatesTest`.
+- **Exe picker (ported from Bannerlator's `GameFolderScanner`):** `GameExePicker` walks up to five
+  folders below the game folder (Bannerlator: four), nearest levels first, at most 400 entries,
+  never through symlinks, past installer / redistributable / extras folders (plus `DotNet*`,
+  `vcredist*`, `$*`, `Engine/Extras`, `Engine/Binaries/ThirdParty`), drops junk exe names, and
+  scores: named after the folder +100 / contains +60, `-Win64/32-Shipping` +70,
+  `Binaries/Win64|Win32` +30, `/bin/` `/bin64/` +10, launcher -40, junk PE name -30, -8 per level,
+  +1 per 8 MB up to 30. The exe box lists that order; a picked exe always wins. Best under 60 or the
+  runner-up within 15: a "?" beside the box ("Check this exe").
+- **Names:** `GameIdentifier` + `PeVersionInfo` ported too (Steam manifest by installdir - the
+  sole-manifest fallback dropped, since an unclaimed steamapps/common folder is not the library's
+  other game - GOG info, the exe's ProductName / FileDescription). An added game takes that title
+  when the disk gives one, else its folder name. Its shortcut appid is stored per folder at the
+  first scan, so a title found later renames the shortcut without moving its id (grid art,
+  prefix, saves stay); a rename made in Steam is kept by the shortcuts writer as before.
+- **Tests:** `AddedGamesCandidatesTest` (Unreal three down over helpers, five down found and six
+  not, skip folders, the walk budget, a launcher below the game, uncertain marking, a pick kept, a
+  deep exe starting in its own folder, the identified title with the id unchanged, a cleaned file
+  name keeping the folder name), `GameIdentifierTest` (ported).
 
 ## 2026-10-09 - `feat/store-credentials-keystore`: store sign-ins sealed with the Android Keystore
 

@@ -311,6 +311,7 @@
     <string name="mode_added_remove">Quitar %1$s</string>
     <string name="mode_added_remove_confirm">¿Quitar?</string>
     <string name="mode_added_removed">Juegos quitados (%1$d)</string>
+    <string name="mode_added_exe_check">Revisa este .exe</string>
     <string name="mode_added_exe_note">Por defecto, el .exe con el nombre de la carpeta o, si no, el más grande.</string>
     <string name="wincomp_title">Componentes de Windows</string>
     <string name="wincomp_pad_hint">LB / RB saltan entre las secciones.</string>
