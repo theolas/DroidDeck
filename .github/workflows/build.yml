@@ -445,6 +445,7 @@ jobs:
         id: build
         env:
           DROIDDECK_BUILD_LABEL: ${{ steps.build-label.outputs.label }}
+          SGDB_API_KEY: ${{ secrets.SGDB_API_KEY }}
         run: |
           set -o pipefail
           ./gradlew assembleRelease --console=plain -PndkVersion="$NDK_VERSION" 2>&1 | tee /tmp/build.log
