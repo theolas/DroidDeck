@@ -106,6 +106,8 @@ class ModeSettings(
     /** Steam only: the user's chosen Games folders; null outside Steam. */
     val addedGamesDirs: List<String>? = null,
     val addedGames: List<AddedGameRow> = emptyList(),
+    /** Folders removed from the added games (by path), offered back by the Removed games row. */
+    val removedAddedGames: List<String> = emptyList(),
     val addedGamesArt: Boolean = true,
     /** Latest Banners-Turnip release: what each driver menu offers to download, and the refresh line. */
     /** Steam only: Decky Loader is managed from the Steam session settings. */
@@ -121,7 +123,11 @@ class ModeSettings(
 )
 
 /** One added game as the settings page shows it: its folder, the chosen .exe, the other .exe files it could be. */
-class AddedGameRow(val folderPath: String, val folderName: String, val exePath: String, val exeName: String, val candidates: List<Pair<String, String>>)
+class AddedGameRow(
+    val folderPath: String, val folderName: String, val exePath: String, val exeName: String, val candidates: List<Pair<String, String>>,
+    /** A folder the user added (a store install is removed from its store's page instead). */
+    val removable: Boolean = true,
+)
 
 class ModeSettingsActions(
     val onResolution: (String) -> Unit,
@@ -158,6 +164,8 @@ class ModeSettingsActions(
     val onForgetAddedGamesDir: (path: String) -> Unit = {},
     val onAddedGamesArt: (Boolean) -> Unit = {},
     val onAddedGameExe: (folderPath: String, path: String) -> Unit = { _, _ -> },
+    val onRemoveAddedGame: (folderPath: String) -> Unit = {},
+    val onRestoreAddedGame: (folderPath: String) -> Unit = {},
     val onPickAddedGameExe: (folderPath: String) -> Unit = {},
     val onDeckyInstall: (DeckyManager.Release) -> Unit = {},
     val onDeckyCheck: () -> Unit = {},
@@ -453,8 +461,13 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
                     g.candidates + ("__pick__" to stringResource(R.string.mode_added_choose)), g.exePath,
                     note = stringResource(R.string.mode_added_exe_note),
                     onPick = { path -> if (path == "__pick__") a.onPickAddedGameExe(g.folderPath) else a.onAddedGameExe(g.folderPath, path) },
+                    trailing = if (g.removable) ({ RemoveButton(stringResource(R.string.mode_added_remove, g.folderName)) { a.onRemoveAddedGame(g.folderPath) } }) else null,
                 )
             }
+            if (s.removedAddedGames.isNotEmpty()) MenuRow(
+                host, "addedRemoved", stringResource(R.string.mode_added_removed, s.removedAddedGames.size), stringResource(R.string.common_restore),
+                s.removedAddedGames.map { it to it.substringAfterLast('/') },
+            ) { path -> a.onRestoreAddedGame(path) }
         }
         if (steam && tab == ModeSettingsTab.GAMES && s.fexPreset != null) SettingsGroup(stringResource(R.string.game_settings_title)) {
             if (s.syncBackend != null) SettingsRow(

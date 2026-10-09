@@ -308,6 +308,9 @@
     <string name="mode_added_launches">启动 %1$s</string>
     <string name="mode_added_launches_in">启动 %1$s · 位于 %2$s</string>
     <string name="mode_added_choose">选择其他文件…</string>
+    <string name="mode_added_remove">移除 %1$s</string>
+    <string name="mode_added_remove_confirm">移除？</string>
+    <string name="mode_added_removed">已移除的游戏（%1$d）</string>
     <string name="mode_added_exe_note">默认为与文件夹同名的 .exe，否则为最大的那个。</string>
     <string name="wincomp_title">Windows 组件</string>
     <string name="wincomp_pad_hint">按 LB / RB 在各部分之间跳转。</string>

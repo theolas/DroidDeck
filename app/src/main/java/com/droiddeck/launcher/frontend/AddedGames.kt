@@ -111,11 +111,14 @@ object AddedGames {
             GameStorage.effective(context)?.let { File(it.path) },
             GameStorage.effective(context)?.let { File(it.path, "steamapps/common") },
         )
+        val removed = SessionPrefs.removedAddedGames(context).toSet()
         for (dir in folders.distinctBy { it.absolutePath }) {
             if (!dir.isDirectory) { Log.w(TAG, "$dir is not a folder; skipped"); continue }
             val steamInstalls = steamInstallDirs(dir)
             for (folder in dir.listFiles { f -> f.isDirectory }?.sortedBy { it.name.lowercase() } ?: emptyList()) {
                 if (folder.name.lowercase() in steamInstalls || folder.name.equals("steamapps", ignoreCase = true)) continue
+                // Removed from the list by the user (the folder stays on disk); restored from the settings page.
+                if (folder.path in removed) continue
                 // The store install root sits inside the Games storage; its games are scanned below, per store.
                 if (folder.name == "Games" && StoreInstallRoot.roots(context).any { it.absolutePath == folder.absolutePath }) continue
                 scanGame(context, folder, out)
@@ -125,6 +128,26 @@ object AddedGames {
         // An unfinished one (sidecar still `installing`, or none at all) is neither a game nor Custom.
         for (folder in StoreInstallRoot.gameFolders(context)) if (StoreInstallRoot.isFinished(folder)) scanGame(context, folder, out)
         return out.distinctBy { it.folder.canonicalPath }
+    }
+
+    /**
+     * Stops listing the added game in [folder]: off the Games tab and, with the listing rewritten
+     * and the running client asked, out of Steam. Nothing on disk is deleted. Blocking.
+     */
+    fun remove(context: Context, folder: File) {
+        val app = context.applicationContext
+        val appId = scan(app).firstOrNull { it.folder.path == folder.path && it.source == Library.ADDED }?.appId
+        SessionPrefs.setAddedGameRemoved(app, folder.path, true)
+        com.droiddeck.launcher.stores.StoreInstalls.register(app)
+        if (appId != null) com.droiddeck.launcher.stores.SteamLiveShortcuts.remove(app, appId)
+        Log.i(TAG, "removed ${folder.name} from the added games")
+    }
+
+    /** Lists a removed game again; Steam gets its shortcut from the listing at the next session start. Blocking. */
+    fun restore(context: Context, folder: File) {
+        val app = context.applicationContext
+        SessionPrefs.setAddedGameRemoved(app, folder.path, false)
+        com.droiddeck.launcher.stores.StoreInstalls.register(app)
     }
 
     /**

@@ -324,6 +324,8 @@ class MainActivity : ComponentActivity() {
     private var addedGamesArt by mutableStateOf(true)
     @Volatile private var artFetchRunning = false
     private var addedGames by mutableStateOf<List<com.droiddeck.launcher.ui.AddedGameRow>>(emptyList())
+    /** Game folders removed from the added games, as the settings page offers them back. */
+    private var removedAddedGames by mutableStateOf<List<String>>(emptyList())
     private val pickRomsDir = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == RESULT_OK) InAppFilePicker.pickedPath(r.data)?.let { path ->
             SessionPrefs.setRomsDir(this, path)
@@ -1255,6 +1257,7 @@ class MainActivity : ComponentActivity() {
                 wifiDiscoveryBlocked = wifiDiscoveryBlocked,
                 addedGamesDirs = if (mode == SessionService.MODE_STEAM) addedGamesDirs else null,
                 addedGames = if (mode == SessionService.MODE_STEAM) addedGames else emptyList(),
+                removedAddedGames = if (mode == SessionService.MODE_STEAM) removedAddedGames else emptyList(),
                 addedGamesArt = addedGamesArt,
                 deckyInstalled = if (mode == SessionService.MODE_STEAM) decky.deckyInstalled else null,
                 deckyLatestRelease = if (mode == SessionService.MODE_STEAM) decky.deckyReleases.firstOrNull() else null,
@@ -1340,6 +1343,8 @@ class MainActivity : ComponentActivity() {
                 onAddedGamesArt = { on -> SessionPrefs.setAddedGamesArt(this, on); addedGamesArt = on; if (on) refreshAddedGames() },
                 onForgetAddedGamesDir = { dir -> SessionPrefs.setAddedGamesDirs(this, addedGamesDirs - dir); addedGamesDirs = SessionPrefs.addedGamesDirs(this); refreshAddedGames(); refresh() },
                 onAddedGameExe = { folder, path -> SessionPrefs.setAddedGameExe(this, folder, path); refreshAddedGames(); refresh() },
+                onRemoveAddedGame = { folder -> changeAddedGame { com.droiddeck.launcher.frontend.AddedGames.remove(this, java.io.File(folder)) } },
+                onRestoreAddedGame = { folder -> changeAddedGame { com.droiddeck.launcher.frontend.AddedGames.restore(this, java.io.File(folder)) } },
                 onPickAddedGameExe = { folder ->
                     pendingAddedGame = folder
                     pickAddedGameExe.launch(InAppFilePicker.buildIntent(this, listOf("exe"), getString(R.string.main_pick_game_exe), folder))
@@ -1403,13 +1408,23 @@ class MainActivity : ComponentActivity() {
     private fun refreshAddedGames() {
         Thread({
             val games = scanAddedGames()
-            ui.post { addedGames = games; fetchAddedGameArt() }
+            val removed = SessionPrefs.removedAddedGames(this)
+            ui.post { addedGames = games; removedAddedGames = removed; fetchAddedGameArt() }
         }, "added-games").start()
+    }
+
+    /** Removes or restores an added game off the main thread (a scan, the listing, the live client), then refreshes. */
+    private fun changeAddedGame(change: () -> Unit) {
+        Thread({
+            try { change() } catch (e: Exception) { Log.w(TAG, "added game change: ${e.message}") }
+            ui.post { refreshAddedGames(); refresh() }
+        }, "added-game-change").start()
     }
 
     /** Walks the added-games folders, which can sit on slow shared storage or an SD card. */
     private fun scanAddedGames() = com.droiddeck.launcher.frontend.AddedGames.scan(this).map { g ->
-        com.droiddeck.launcher.ui.AddedGameRow(g.folder.path, g.folderName(), g.exe.path, g.exe.name, (g.candidates + g.exe).map { c -> c.path to c.name }.distinctBy { it.first })
+        com.droiddeck.launcher.ui.AddedGameRow(g.folder.path, g.folderName(), g.exe.path, g.exe.name, (g.candidates + g.exe).map { c -> c.path to c.name }.distinctBy { it.first },
+            removable = g.source == com.droiddeck.launcher.frontend.Library.ADDED)
     }
 
     private fun fetchAddedGameArt() {
@@ -1471,11 +1486,13 @@ class MainActivity : ComponentActivity() {
         Thread({
             drivers.refreshDrivers()
             val games = scanAddedGames()
+            val removed = SessionPrefs.removedAddedGames(this)
             val storage = GameStorage.options(this)
             val deckyInstalled = if (mode == SessionService.MODE_STEAM) DeckyManager.installed(this) else null
             val deckySupervisor = mode == SessionService.MODE_STEAM && DeckyManager.supervisorEnabled(this)
             ui.post {
                 addedGames = games
+                removedAddedGames = removed
                 storageOptions = storage
                 if (mode == SessionService.MODE_STEAM) {
                     decky.deckyInstalled = deckyInstalled
