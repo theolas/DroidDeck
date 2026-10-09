@@ -7,6 +7,24 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
 
 ---
 
+## 2026-10-09 - `feat/added-games-remove`: remove an added game; deeper .exe search
+
+- **Remove:** Steam settings › Games lists each added game with its exe box; a trash-can button
+  beside it (press, it turns red with "Remove?", press again within four seconds) stops listing
+  the game: `AddedGames.remove` records the folder path (`SessionPrefs.removedAddedGames`), rewrites
+  the listing the shortcuts writer reads (`StoreInstalls.register`) and asks a running client to
+  drop the shortcut (`SteamLiveShortcuts.remove`). Nothing on disk is deleted. A scan skips removed
+  folders, so a rescan does not bring them back; "Removed games (N)" at the end of the list opens a
+  menu that restores any of them (the shortcut returns at the next session start). Store installs
+  have no button. Tests: `AddedGamesRemoveTest`.
+- **Deeper .exe search:** `AddedGames.candidates` looks up to five folders below the game folder
+  (was one), nearest levels first, at most 400 folders/.exe files per game, never through symlinks,
+  past installer and redistributable folders (`_CommonRedist`, `Redist`, `DirectX`, `DotNet*`,
+  `vcredist*`, `Prerequisites`, `Support`, `Engine/Extras`, `Engine/Binaries/ThirdParty`,
+  `__Installer`, `Installers`, `.git`, `$*`). Ranked: in the game folder, named after it, an Unreal
+  `Binaries/Win64` build (`*-Shipping.exe` or named after the folder), shallower, larger. A picked
+  exe still wins; a deep exe starts in its own folder. Tests: `AddedGamesCandidatesTest`.
+
 ## 2026-10-09 - `feat/store-credentials-keystore`: store sign-ins sealed with the Android Keystore
 
 - **What:** `filesDir/stores/<store>/credentials.json` (GOG, Epic, Amazon: tokens, ids, names,

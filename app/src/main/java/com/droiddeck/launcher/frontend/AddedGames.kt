@@ -89,21 +89,71 @@ object AddedGames {
         return null
     }
 
-    /** The .exe files a game folder offers, best first. */
-    fun candidates(folder: File): List<File> {
-        val exes = ArrayList<File>()
-        val roots = listOf(folder) + (folder.listFiles { f -> f.isDirectory }?.sortedBy { it.name.lowercase() } ?: emptyList())
-        for (dir in roots) {
-            dir.listFiles { f -> f.isFile && f.name.endsWith(".exe", ignoreCase = true) && !SKIP.matches(f.name) }
-                ?.let { exes.addAll(it) }
-        }
-        val key = folder.name.lowercase().replace(Regex("[^a-z0-9]"), "")
-        return exes.sortedWith(
-            compareByDescending<File> { it.parentFile == folder }
-                .thenByDescending { it.nameWithoutExtension.lowercase().replace(Regex("[^a-z0-9]"), "").let { n -> n == key || key.startsWith(n) || n.startsWith(key) } }
-                .thenByDescending { it.length() },
-        )
+    /** How far below a game folder its .exe files are looked for (an Unreal game's sits three down). */
+    internal const val EXE_DEPTH = 5
+
+    /** Folders and .exe files looked at per game before the walk stops, so a huge game stays quick. */
+    internal const val EXE_WALK_BUDGET = 400
+
+    /** Folders that hold installers, redistributables and tools, never the game. */
+    private val SKIP_DIR = Regex("(?i)^(_?commonredist|redist|directx|dotnet.*|vcredist.*|prerequisites|support|__installer|installers|\\.git|\\$.*)$")
+    private val SKIP_PATH = listOf("engine/extras", "engine/binaries/thirdparty")
+
+    private fun skipDir(dir: File, relative: String): Boolean {
+        if (SKIP_DIR.matches(dir.name)) return true
+        val rel = relative.lowercase()
+        return SKIP_PATH.any { rel == it || rel.endsWith("/$it") }
     }
+
+    private fun isLink(f: File): Boolean = runCatching { java.nio.file.Files.isSymbolicLink(f.toPath()) }.getOrDefault(false)
+
+    /**
+     * The .exe files a game folder offers, best first: up to [EXE_DEPTH] folders down, nearest
+     * levels first, at most [EXE_WALK_BUDGET] entries, past installer and redistributable folders
+     * and symlinks. Ranked: in the game folder itself, named after the folder, an Unreal build's
+     * `Binaries/Win64` (`*-Shipping.exe` or named after the folder), shallower, larger.
+     */
+    fun candidates(folder: File): List<File> {
+        val found = ArrayList<Pair<File, Int>>()
+        var visited = 0
+        var level = listOf(folder)
+        var depth = 0
+        walk@ while (level.isNotEmpty()) {
+            val next = ArrayList<File>()
+            for (dir in level) {
+                val entries = dir.listFiles()?.sortedBy { it.name.lowercase() } ?: continue
+                for (f in entries) {
+                    if (visited >= EXE_WALK_BUDGET) break@walk
+                    if (isLink(f)) continue
+                    if (f.isDirectory) {
+                        visited++
+                        if (depth + 1 <= EXE_DEPTH && !skipDir(f, f.relativeTo(folder).invariantSeparatorsPath)) next.add(f)
+                    } else if (f.isFile && f.name.endsWith(".exe", ignoreCase = true)) {
+                        visited++
+                        if (!SKIP.matches(f.name)) found.add(f to depth)
+                    }
+                }
+            }
+            level = next
+            depth++
+        }
+        val key = norm(folder.name)
+        val named = { f: File -> norm(f.nameWithoutExtension).let { n -> n.isNotEmpty() && (n == key || key.startsWith(n) || n.startsWith(key)) } }
+        val unreal = { f: File ->
+            val parent = f.parentFile
+            parent?.name.equals("Win64", ignoreCase = true) && parent?.parentFile?.name.equals("Binaries", ignoreCase = true) &&
+                (f.nameWithoutExtension.endsWith("-Shipping", ignoreCase = true) || norm(f.nameWithoutExtension).startsWith(key))
+        }
+        return found.sortedWith(
+            compareByDescending<Pair<File, Int>> { it.first.parentFile == folder }
+                .thenByDescending { named(it.first) }
+                .thenByDescending { unreal(it.first) }
+                .thenBy { it.second }
+                .thenByDescending { it.first.length() },
+        ).map { it.first }
+    }
+
+    private fun norm(name: String): String = name.lowercase().replace(Regex("[^a-z0-9]"), "")
 
     fun scan(context: Context): List<Game> {
         val out = ArrayList<Game>()
