@@ -580,7 +580,6 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
 }
 
 /** Width × height for the session, with the common handheld shapes one tap away. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 /** Entry for the user's SteamGridDB API key; the saved key is never shown back. */
 @Composable
 internal fun SgdbKeyDialog(hasKey: Boolean, onSave: (String) -> Unit, onDismiss: () -> Unit) {
@@ -606,6 +605,7 @@ internal fun SgdbKeyDialog(hasKey: Boolean, onSave: (String) -> Unit, onDismiss:
     )
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun CustomResolutionDialog(initial: Pair<Int, Int>?, onSave: (Pair<Int, Int>) -> Unit, onDismiss: () -> Unit) {
     var w by remember { mutableStateOf(initial?.first?.toString() ?: "") }
