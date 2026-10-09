@@ -111,10 +111,29 @@ object SteamGridDb {
             val bytes = AddedGameArt.get(url) ?: continue
             val tmp = File(cache, "$local.tmp")
             tmp.writeBytes(bytes)
-            if (tmp.renameTo(dst)) got = true
+            if (tmp.renameTo(dst)) { got = true; File(cache, "$local.src").writeText(AddedGameArt.SGDB) }
         }
         return got
     }
+
+    /** The best-scored [limit] images for [slot] of game [id], as (thumbnail, full image) URLs. */
+    fun images(key: String, id: Int, slot: AddedGameArt.Slot, limit: Int): List<Pair<String, String>> {
+        val path = when (slot) {
+            AddedGameArt.Slot.COVER -> "grids/game/$id?dimensions=600x900&$QUERY"
+            AddedGameArt.Slot.BACKGROUND -> "heroes/game/$id?$QUERY"
+            AddedGameArt.Slot.LOGO -> "logos/game/$id?$QUERY"
+            AddedGameArt.Slot.ICON -> "icons/game/$id?$QUERY"
+        }
+        val items = json(key, "$API/$path")?.optJSONArray("data") ?: return emptyList()
+        return ranked(items, pngOnly = slot == AddedGameArt.Slot.LOGO || slot == AddedGameArt.Slot.ICON).take(limit)
+    }
+
+    /** [items] best-scored first, as (thumbnail, full image) URLs; for a .png slot only PNGs. */
+    internal fun ranked(items: JSONArray, pngOnly: Boolean): List<Pair<String, String>> =
+        (0 until items.length()).map { items.getJSONObject(it) }
+            .filter { it.optString("url").startsWith("https://") && (!pngOnly || it.optString("mime") == "image/png" || it.optString("url").endsWith(".png", true)) }
+            .sortedByDescending { it.optInt("score", 0) }
+            .map { (it.optString("thumb").takeIf { t -> t.startsWith("https://") } ?: it.optString("url")) to it.optString("url") }
 
     /** The highest-scored image's URL; for a .png slot only a PNG. */
     internal fun best(items: JSONArray, pngOnly: Boolean): String? =

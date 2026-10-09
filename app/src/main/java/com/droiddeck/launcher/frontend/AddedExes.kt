@@ -6,14 +6,15 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Games added as one picked .exe (the Games tab's +) rather than a whole Games folder: kept by
- * the exe's folder in `files/added-exes.json`, which [AddedGames.scan] merges in. The exe chosen
- * for the folder, its shortcut appid and its removal live where every added game keeps them
- * ([com.droiddeck.launcher.session.SessionPrefs]); this holds which folders are games and the
- * exe first picked.
+ * Games added from the Games tab's + rather than a Games folder: one picked .exe, or each game
+ * "Add all games in this folder" found. Kept by the game's folder in `files/added-exes.json`,
+ * which [AddedGames.scan] merges in. The exe chosen later, the shortcut appid, the edits and the
+ * removal live where every added game keeps them ([com.droiddeck.launcher.session.SessionPrefs]);
+ * this holds which folders are games and the exe they came with.
  */
 object AddedExes {
-    class Entry(val folder: String, val exe: String)
+    /** [picked]: the user chose [exe]; false = [GameExePicker]'s best guess, which a scan ranks again. */
+    class Entry(val folder: String, val exe: String, val picked: Boolean = true)
 
     private fun file(context: Context) = File(context.filesDir, "added-exes.json")
 
@@ -23,7 +24,7 @@ object AddedExes {
         (0 until array.length()).mapNotNull { i ->
             val o = array.optJSONObject(i) ?: return@mapNotNull null
             val folder = o.optString("folder"); val exe = o.optString("exe")
-            if (folder.isEmpty() || exe.isEmpty()) null else Entry(folder, exe)
+            if (folder.isEmpty() || exe.isEmpty()) null else Entry(folder, exe, o.optBoolean("picked", true))
         }
     } catch (e: Exception) {
         emptyList()
@@ -38,7 +39,7 @@ object AddedExes {
 
     private fun write(context: Context, entries: List<Entry>) {
         val array = JSONArray()
-        entries.forEach { array.put(JSONObject().put("folder", it.folder).put("exe", it.exe)) }
+        entries.forEach { array.put(JSONObject().put("folder", it.folder).put("exe", it.exe).put("picked", it.picked)) }
         val f = file(context)
         val tmp = File(f.path + ".tmp")
         tmp.writeText(array.toString())

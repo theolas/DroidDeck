@@ -639,6 +639,46 @@ object SessionPrefs {
         }
     }
 
+    /** An added game's name as the user set it (in the app, or in Steam's Properties); "" = automatic. */
+    fun addedGameName(context: Context, folderPath: String): String = prefs(context).getString("addedName:$folderPath", "") ?: ""
+
+    fun setAddedGameName(context: Context, folderPath: String, name: String) {
+        prefs(context).edit().putString("addedName:$folderPath", name.trim()).apply()
+    }
+
+    /** An added game's Start in, as the session sees it; "" = the exe's own folder. */
+    fun addedGameStartIn(context: Context, folderPath: String): String = prefs(context).getString("addedStartIn:$folderPath", "") ?: ""
+
+    fun setAddedGameStartIn(context: Context, folderPath: String, guestDir: String) {
+        prefs(context).edit().putString("addedStartIn:$folderPath", guestDir.trim()).apply()
+    }
+
+    /** An added game's launch options, as Steam takes them ("-dx11", "VAR=1 %command%"). */
+    fun addedGameLaunch(context: Context, folderPath: String): String = prefs(context).getString("addedLaunch:$folderPath", "") ?: ""
+
+    fun setAddedGameLaunch(context: Context, folderPath: String, options: String) {
+        prefs(context).edit().putString("addedLaunch:$folderPath", options.trim()).apply()
+    }
+
+    /**
+     * The last value of [field] (AppName, StartDir, LaunchOptions) taken over from Steam's own
+     * Properties for this game, so the same Steam edit is not taken again over a later app edit.
+     */
+    fun addedGameAdopted(context: Context, folderPath: String, field: String): String? =
+        prefs(context).getString("addedAdopted:$field:$folderPath", null)
+
+    fun setAddedGameAdopted(context: Context, folderPath: String, field: String, value: String) {
+        prefs(context).edit().putString("addedAdopted:$field:$folderPath", value).apply()
+    }
+
+    /** Where an added game's art for [slot] comes from when the user chose it ("folder", "steam", "sgdb", "file"); "" = automatic. */
+    fun addedGameArtSource(context: Context, folderPath: String, slot: String): String =
+        prefs(context).getString("addedArt:$slot:$folderPath", "") ?: ""
+
+    fun setAddedGameArtSource(context: Context, folderPath: String, slot: String, source: String) {
+        prefs(context).edit().putString("addedArt:$slot:$folderPath", source).apply()
+    }
+
     /** Whether added games without art of their own get Steam's store art fetched for them. */
     fun addedGamesArt(context: Context): Boolean = prefs(context).getBoolean("addedGamesArt", true)
 

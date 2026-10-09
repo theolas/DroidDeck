@@ -7,67 +7,31 @@ the timeline, then lessons and backlog. Companion to the README (what the app *d
 
 ---
 
-## 2026-10-09 - `feat/added-games-remove`: add a game from its exe, remove one; exe picker, titles, art
+## 2026-10-09 - `feat/games-add-edit`: add games from the Games tab, edit them like Steam's Properties
 
-- **Remove:** Steam settings › Games lists each added game with its exe box; a red X beside it
-  (press, it fills red with "Remove?", press again within four seconds) stops listing the game:
-  `AddedGames.remove` records the folder path (`SessionPrefs.removedAddedGames`), rewrites the
-  listing the shortcuts writer reads (`StoreInstalls.register`) and asks a running client to drop
-  the shortcut (`SteamLiveShortcuts.remove`). Nothing on disk is deleted. A scan skips removed
-  folders, so a rescan does not bring them back; "Removed games (N)" at the end of the list opens a
-  menu that restores any of them (the shortcut returns at the next session start). Store installs
-  have no button. Tests: `AddedGamesRemoveTest`.
-- **+ on the Games tab:** a round + beside "Games N" (also on the empty and one-game pages, not in
-  the shortcut picker) opens a compact dialog (`ExePickerDialog`, the Install dialog's shell: 440
-  dp, "Add a game:" and Cancel on one line): storage rows (Internal storage, each card, free
-  space), then a breadcrumb, "..", folders and .exe files (name, size) scrolling inside, up to 70%
-  of the screen. B / Back goes up a folder and closes from the storage rows. Setup's "Choose
-  another file…" opens the same dialog at the game's folder, titled "Pick the exe:". The pick is
-  the whole flow
-  (`AddedGames.addExe`): the game it already is gets selected; an exe inside a listed or removed
-  game's folder switches that game's exe; otherwise its folder becomes a game of its own
-  (`AddedExes`, `files/added-exes.json`: folder and first exe), named by `GameIdentifier` (else
-  the folder), registered like added folders (listing rewrite, live add to a running client),
-  appid stored at the first scan, listed in Steam settings › Games with the exe box, "?" and X,
-  and selected on the Games tab. The session must see the path: Games folders, the Steam library
-  card, store roots, the runtime tree, and now internal storage anywhere (`/root/Storage`, bound in
-  every session); elsewhere (a card not otherwise bound) the pick is refused with one line.
-  Tests: `AddedExesTest`.
-- **Exe picker (ported from Bannerlator's `GameFolderScanner`):** `GameExePicker` walks up to five
-  folders below the game folder (Bannerlator: four), nearest levels first, at most 400 entries,
-  never through symlinks, past installer / redistributable / extras folders (plus `DotNet*`,
-  `vcredist*`, `$*`, `Engine/Extras`, `Engine/Binaries/ThirdParty`), drops junk exe names, and
-  scores: named after the folder +100 / contains +60, `-Win64/32-Shipping` +70,
-  `Binaries/Win64|Win32` +30, `/bin/` `/bin64/` +10, launcher -40, junk PE name -30, -8 per level,
-  +1 per 8 MB up to 30. The exe box lists that order; a picked exe always wins. Best under 60 or the
-  runner-up within 15: a "?" beside the box ("Check this exe").
-- **Names:** `GameIdentifier` + `PeVersionInfo` ported too (Steam manifest by installdir - the
-  sole-manifest fallback dropped, since an unclaimed steamapps/common folder is not the library's
-  other game - GOG info, the exe's ProductName / FileDescription). An added game takes that title
-  when the disk gives one, else its folder name. Its shortcut appid is stored per folder at the
-  first scan, so a title found later renames the shortcut without moving its id (grid art,
-  prefix, saves stay); a rename made in Steam is kept by the shortcuts writer as before.
-- **Art (`AddedGameArt`):** Steam first - the appid the game's files name (`steam_appid.txt`,
-  emulator ini, appmanifest) straight to the CDN, no search; else a store search on the game's
-  title that is taken only when a result's name matches (same, same without edition words, or one
-  a prefix of the other; the old "first result counts" rule is gone). Then SteamGridDB
-  (`SteamGridDb`) when a key is set: by Steam appid (`/games/steam/{id}`) else a name-matched
-  autocomplete result; best-scored 600x900 grid, 460x215/920x430 grid, hero, logo, icon
-  (`nsfw=false&humor=false`), into the same cache names (icon as `icon-sgdb.png`, ahead of the exe
-  icon). Same once-per-game rule, misses retried after a week. The switch is now "Artwork".
-- **SteamGridDB key:** Steam settings › Games › "SteamGridDB API key" (Edit… opens a masked
-  field; the saved key is never shown back): the user's key, sealed with `CredentialCipher` in
-  `files/sgdb/key.json`, wins over `BuildConfig.SGDB_API_KEY`; no key, no SteamGridDB step. The
-  app reads the build field by name, so it builds and runs before the field exists: the
-  `buildConfigField` line in `app/build.gradle` and the secret in the workflow's build step are
-  the build owner's to add. The key goes only in the Authorization header; request failures log
-  the URL path, never headers.
-- **Tests:** `AddedGameArtLookupTest` (appid used without a search, a week between searches, no
-  blind first match on Steam or SteamGridDB, best-scored image, key precedence, the key sealed and
-  cleared), `AddedGamesCandidatesTest` (Unreal three down over helpers, five down found and six
-  not, skip folders, the walk budget, a launcher below the game, uncertain marking, a pick kept, a
-  deep exe starting in its own folder, the identified title with the id unchanged, a cleaned file
-  name keeping the folder name), `GameIdentifierTest` (ported).
+- **Steam ⚙ settings:** the Games section is gone (it was a feature, not a setting). Games
+  folders added before keep listing their games.
+- **+ beside "Games N":** a compact in-app picker (storage step, then the storage root; every
+  folder A-Z, unreadable ones greyed; `.exe` only; width fixed at opening; red X; B goes up).
+  Picking an exe adds the game (name from `GameIdentifier`, art, Custom chip, Steam shortcut via
+  the listing and the running client, Start in = exe folder) and selects it; an exe in a listed
+  game switches its target; the same exe again selects it; a path the session cannot see is
+  refused. Internal storage anywhere now maps to `/root/Storage`.
+- **"Add all games in this folder":** each subfolder with its best exe (`GameExePicker`, depth
+  5, "?" when unsure), listed ones skipped, then a summary (added, already there, rows that open
+  the editor with back to the summary).
+- **✎ editor** on a Custom game: Name, Target (ranked, "?", Other exe…), Start in, Launch
+  options, Artwork (Cover, Background, Logo, Icon with thumbnails and sources; chooser with the
+  game folder, Steam and SteamGridDB; Pick image…; Reset to automatic), Remove (two presses, files
+  kept). Every edit goes through the same shortcut on its stored appid (listing + live DevTools);
+  the writer keeps Steam-side edits and records them, and the app takes them over once.
+- **Setup:** Artwork switch and SteamGridDB API key (user key sealed with the Keystore, wins over
+  `BuildConfig.SGDB_API_KEY` from the `SGDB_API_KEY` secret).
+- Brought over from `feat/added-games-remove` (not merged): `GameExePicker`, `GameIdentifier` +
+  `PeVersionInfo`, the art and SteamGridDB work, the build secret, the + and the picker.
+- Docs: `docs/development/added-games.md`. Tests: `AddedExesTest`, `AddedGameEditsTest`,
+  `AddedGamesCandidatesTest`, `AddedGameArtLookupTest`, `GameIdentifierTest`, `PickListingTest`,
+  `AddedGamesRemoveTest`, `test_steam_shortcuts.py`. Not yet on a device.
 
 ## 2026-10-09 - `feat/store-credentials-keystore`: store sign-ins sealed with the Android Keystore
 

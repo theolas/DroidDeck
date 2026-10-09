@@ -103,14 +103,6 @@ class ModeSettings(
     val wifiDiscoveryLocation: Boolean = false,
     val wifiDiscoveryAsked: Boolean = false,
     val wifiDiscoveryBlocked: Boolean = false,
-    /** Steam only: the user's chosen Games folders; null outside Steam. */
-    val addedGamesDirs: List<String>? = null,
-    val addedGames: List<AddedGameRow> = emptyList(),
-    /** Folders removed from the added games (by path), offered back by the Removed games row. */
-    val removedAddedGames: List<String> = emptyList(),
-    val addedGamesArt: Boolean = true,
-    /** The user entered a SteamGridDB API key of their own. */
-    val sgdbUserKey: Boolean = false,
     /** Latest Banners-Turnip release: what each driver menu offers to download, and the refresh line. */
     /** Steam only: Decky Loader is managed from the Steam session settings. */
     val deckyInstalled: String? = null,
@@ -122,15 +114,6 @@ class ModeSettings(
     val deckyDownloadingBinary: Boolean = false,
     val deckyEnabled: Boolean = false,
     val deckySessionRunning: Boolean = false,
-)
-
-/** One added game as the settings page shows it: its folder, the chosen .exe, the other .exe files it could be. */
-class AddedGameRow(
-    val folderPath: String, val folderName: String, val exePath: String, val exeName: String, val candidates: List<Pair<String, String>>,
-    /** A folder the user added (a store install is removed from its store's page instead). */
-    val removable: Boolean = true,
-    /** The exe is the app's guess and nothing clearly won. */
-    val uncertain: Boolean = false,
 )
 
 class ModeSettingsActions(
@@ -164,14 +147,6 @@ class ModeSettingsActions(
     val onRunSteamAtStartup: (Boolean) -> Unit = {},
     val onWifiDiscovery: (Boolean) -> Unit = {},
     val onWifiDiscoverySettings: () -> Unit = {},
-    val onPickAddedGamesDir: () -> Unit = {},
-    val onForgetAddedGamesDir: (path: String) -> Unit = {},
-    val onAddedGamesArt: (Boolean) -> Unit = {},
-    /** The user's SteamGridDB API key; "" removes it. */
-    val onSgdbKey: (String) -> Unit = {},
-    val onAddedGameExe: (folderPath: String, path: String) -> Unit = { _, _ -> },
-    val onRemoveAddedGame: (folderPath: String) -> Unit = {},
-    val onRestoreAddedGame: (folderPath: String) -> Unit = {},
     val onDeckyInstall: (DeckyManager.Release) -> Unit = {},
     val onDeckyCheck: () -> Unit = {},
     val onDeckyEnabled: (Boolean) -> Unit = {},
@@ -195,8 +170,6 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
     val host = rememberMenuHost()
     var confirmDeckyRemoval by remember { mutableStateOf(false) }
     var explainWifiDiscovery by remember { mutableStateOf(false) }
-    var editSgdbKey by remember { mutableStateOf(false) }
-    var pickExeFor by remember { mutableStateOf<String?>(null) }
     var tabIndex by androidx.compose.runtime.saveable.rememberSaveable(s.mode) { mutableStateOf(0) }
     val tabs = if (steam) ModeSettingsTab.entries else listOf(
         ModeSettingsTab.DISPLAY, ModeSettingsTab.CONTROLS, ModeSettingsTab.SESSION,
@@ -444,45 +417,6 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
                 }
             }
         }
-        if (steam && tab == ModeSettingsTab.GAMES && s.addedGamesDirs != null) SettingsGroup(stringResource(R.string.mode_added_games)) {
-            for (dir in s.addedGamesDirs) {
-                val n = s.addedGames.count { it.folderPath.startsWith("$dir/") }
-                ActionRow(
-                    dir.substringAfterLast('/').ifEmpty { dir }, dir + " · " + (if (n == 0) stringResource(R.string.mode_added_none) else pluralStringResource(R.plurals.mode_added_count, n, n)) + ". " + stringResource(R.string.added_games_forget_hint),
-                    stringResource(R.string.common_forget), onClick = { a.onForgetAddedGamesDir(dir) },
-                )
-            }
-            ActionRow(
-                if (s.addedGamesDirs.isEmpty()) stringResource(R.string.mode_games_folder) else stringResource(R.string.mode_games_folder_another),
-                stringResource(R.string.added_games_import_hint),
-                stringResource(R.string.common_add_ellipsis), onClick = a.onPickAddedGamesDir,
-            )
-            ToggleRow(
-                host, "addedArt", stringResource(R.string.mode_added_art),
-                stringResource(R.string.mode_added_art_hint),
-                s.addedGamesArt, onChange = a.onAddedGamesArt,
-            )
-            ActionRow(
-                stringResource(R.string.mode_sgdb_key), if (s.sgdbUserKey) stringResource(R.string.mode_sgdb_key_yours) else null,
-                stringResource(R.string.mode_sgdb_edit), onClick = { editSgdbKey = true },
-            )
-            for (g in s.addedGames) {
-                ChoiceRow(
-                    host, "added:" + g.folderPath, g.folderName, if (s.addedGamesDirs.size > 1) stringResource(R.string.mode_added_launches_in, g.exeName, g.folderPath.substringBeforeLast('/').substringAfterLast('/')) else stringResource(R.string.mode_added_launches, g.exeName),
-                    g.candidates + ("__pick__" to stringResource(R.string.mode_added_choose)), g.exePath,
-                    note = stringResource(R.string.mode_added_exe_note),
-                    onPick = { path -> if (path == "__pick__") pickExeFor = g.folderPath else a.onAddedGameExe(g.folderPath, path) },
-                    trailing = if (g.removable || g.uncertain) ({
-                        if (g.uncertain) UncertainMark(stringResource(R.string.mode_added_exe_check))
-                        if (g.removable) RemoveButton(stringResource(R.string.mode_added_remove, g.folderName)) { a.onRemoveAddedGame(g.folderPath) }
-                    }) else null,
-                )
-            }
-            if (s.removedAddedGames.isNotEmpty()) MenuRow(
-                host, "addedRemoved", stringResource(R.string.mode_added_removed, s.removedAddedGames.size), stringResource(R.string.common_restore),
-                s.removedAddedGames.map { it to it.substringAfterLast('/') },
-            ) { path -> a.onRestoreAddedGame(path) }
-        }
         if (steam && tab == ModeSettingsTab.GAMES && s.fexPreset != null) SettingsGroup(stringResource(R.string.game_settings_title)) {
             if (s.syncBackend != null) SettingsRow(
                 stringResource(R.string.sync_backend_title),
@@ -554,10 +488,6 @@ fun ModeSettingsPage(s: ModeSettings, a: ModeSettingsActions) {
             )
         }
     }
-    pickExeFor?.let { folder ->
-        ExePickerDialog(stringResource(R.string.games_pick_exe_title), start = java.io.File(folder), onPick = { a.onAddedGameExe(folder, it.path) }, onDismiss = { pickExeFor = null })
-    }
-    if (editSgdbKey) SgdbKeyDialog(s.sgdbUserKey, onSave = { a.onSgdbKey(it); editSgdbKey = false }, onDismiss = { editSgdbKey = false })
     if (explainWifiDiscovery) AlertDialog(
         onDismissRequest = { explainWifiDiscovery = false },
         title = { Text(stringResource(R.string.mode_wifi_explain_title)) },

@@ -29,13 +29,40 @@ object AddedGameArt {
         val any get() = portrait != null || header != null || hero != null || logo != null
     }
 
+    /**
+     * The pieces a user can choose, as the client takes them: [assetType] is its custom-artwork
+     * number (null: the icon, set by path); [cacheName] the automatic file in the game's cache.
+     */
+    enum class Slot(val key: String, val cacheName: String, val assetType: Int?) {
+        COVER("p", "p.jpg", 0), BACKGROUND("hero", "hero.jpg", 1), LOGO("logo", "logo.png", 2), ICON("icon", "icon.png", null),
+    }
+
+    /** Where a piece came from; [AUTO] = nothing found yet. */
+    const val FOLDER = "folder"
+    const val STEAM = "steam"
+    const val SGDB = "sgdb"
+    const val FILE = "file"
+    const val EXE = "exe"
+    const val AUTO = ""
+
+    /** A slot as it stands: the file shown and where it came from (one of [FOLDER].. [AUTO]); [chosen] = the user picked it. */
+    class SlotState(val slot: Slot, val file: File?, val source: String, val chosen: Boolean)
+
+    /** One image the chooser offers: its group ([FOLDER], [STEAM], [SGDB]), a thumbnail and the full image (URL or path). */
+    class Option(val group: String, val thumb: String, val full: String)
+
+    private val CHOSEN = Regex("""chosen-(\w+)\.(\w+)""")
+
+    private fun chosen(cache: File, slot: Slot): File? =
+        cache.listFiles { f -> CHOSEN.matchEntire(f.name)?.groupValues?.get(1) == slot.key }?.firstOrNull()
+
     private val IMAGE = listOf("png", "jpg", "jpeg")
     private val PORTRAIT = listOf("cover", "poster", "grid", "boxart", "capsule", "folder", "library_600x900", "portrait")
     private val HEADER = listOf("header", "banner", "library_header", "wide")
     private val HERO = listOf("hero", "background", "library_hero")
     private val LOGO = listOf("logo")
 
-    private fun cacheDir(context: Context, game: AddedGames.Game) = File(context.filesDir, "added-art/${game.appId}")
+    internal fun cacheDir(context: Context, game: AddedGames.Game) = File(context.filesDir, "added-art/${game.appId}")
 
     /** An image in the folder (or its `art` subfolder) under one of the given names, any image extension. */
     private fun find(folder: File, names: List<String>): File? {
@@ -59,19 +86,111 @@ object AddedGameArt {
         )
     }
 
-    /** The folder's art, else the cached Steam art, without touching the network. */
+    /** The user's choice for each piece, else the folder's art, else the cached art; no network. */
     fun resolve(context: Context, game: AddedGames.Game): Art {
         val own = local(game)
         val cache = cacheDir(context, game)
         fun cached(name: String) = File(cache, name).takeIf { it.isFile }
         return Art(
-            portrait = own.portrait ?: cached("p.jpg"),
+            portrait = chosen(cache, Slot.COVER) ?: own.portrait ?: cached("p.jpg"),
             header = own.header ?: cached("header.jpg"),
-            hero = own.hero ?: cached("hero.jpg"),
-            logo = own.logo ?: cached("logo.png"),
-            icon = own.icon ?: cached("icon-sgdb.png") ?: exeIcon(context, game),
+            hero = chosen(cache, Slot.BACKGROUND) ?: own.hero ?: cached("hero.jpg"),
+            logo = chosen(cache, Slot.LOGO) ?: own.logo ?: cached("logo.png"),
+            icon = chosen(cache, Slot.ICON) ?: own.icon ?: cached("icon-sgdb.png") ?: exeIcon(context, game),
         )
     }
+
+    /** Each choosable piece with its file and where it came from, for the game's editor; no network. */
+    fun describe(context: Context, game: AddedGames.Game): List<SlotState> {
+        val own = local(game)
+        val cache = cacheDir(context, game)
+        fun cached(name: String): Pair<File, String>? = File(cache, name).takeIf { it.isFile }?.let { f ->
+            f to (File(cache, "$name.src").takeIf { it.isFile }?.readText()?.trim()?.takeIf { it.isNotEmpty() } ?: STEAM)
+        }
+        return Slot.values().map { slot ->
+            chosen(cache, slot)?.let { return@map SlotState(slot, it, chosenSource(context, game, slot).first.ifEmpty { FILE }, true) }
+            val auto: Pair<File, String>? = when (slot) {
+                Slot.COVER -> own.portrait?.let { it to FOLDER } ?: cached("p.jpg")
+                Slot.BACKGROUND -> own.hero?.let { it to FOLDER } ?: cached("hero.jpg")
+                Slot.LOGO -> own.logo?.let { it to FOLDER } ?: cached("logo.png")
+                Slot.ICON -> own.icon?.let { it to FOLDER } ?: File(cache, "icon-sgdb.png").takeIf { it.isFile }?.let { it to SGDB }
+                    ?: exeIcon(context, game)?.let { it to EXE }
+            }
+            SlotState(slot, auto?.first, auto?.second ?: AUTO, false)
+        }
+    }
+
+    private val CHOOSABLE = setOf("png", "jpg", "jpeg", "webp")
+
+    /** Images in the game's folder (and its art folders) that could stand for a piece. */
+    internal fun folderImages(folder: File): List<File> =
+        listOf(folder, File(folder, "art"), File(folder, ".art")).flatMap { dir ->
+            dir.listFiles { f -> f.isFile && f.extension.lowercase() in CHOOSABLE }?.sortedBy { it.name.lowercase() }.orEmpty()
+        }.take(12)
+
+    /**
+     * What the chooser offers for [slot]: the game folder's images, Steam's official piece (when the
+     * game has a Steam appid and Steam has the piece), and SteamGridDB's best few (with a key).
+     * Blocking: it asks the network.
+     */
+    fun options(context: Context, game: AddedGames.Game, slot: Slot): List<Option> {
+        val out = ArrayList<Option>()
+        folderImages(game.folder).forEach { out.add(Option(FOLDER, it.path, it.path)) }
+        val cache = cacheDir(context, game)
+        val steamId = runCatching { GameIdentifier.identify(game.exe).appId?.toString() }.getOrNull()
+            ?: File(cache, "steam-appid").takeIf { it.isFile }?.readText()?.trim()?.takeIf { it.isNotEmpty() && it != "none" }
+        val remote = when (slot) { Slot.COVER -> "library_600x900.jpg"; Slot.BACKGROUND -> "library_hero.jpg"; Slot.LOGO -> "logo.png"; Slot.ICON -> null }
+        if (steamId != null && remote != null) {
+            val url = "$CDN$steamId/$remote"
+            if (exists(url)) out.add(Option(STEAM, url, url))
+        }
+        val key = SteamGridDb.key(context)
+        if (key.isNotEmpty()) {
+            cache.mkdirs()
+            val gridId = remembered(File(cache, "sgdb-id")) {
+                runCatching { SteamGridDb.gameId(key, steamId?.toIntOrNull(), game.name) }.getOrNull()?.toString()
+            }?.toIntOrNull()
+            if (gridId != null) runCatching { SteamGridDb.images(key, gridId, slot, if (slot == Slot.ICON) 3 else 5) }.getOrNull()
+                ?.forEach { (thumb, full) -> out.add(Option(SGDB, thumb, full)) }
+        }
+        return out
+    }
+
+    /** Sets [slot] to [option] (a file is copied, a URL fetched) and records where it came from. False when it could not be had. Blocking. */
+    fun choose(context: Context, game: AddedGames.Game, slot: Slot, option: Option): Boolean {
+        val bytes = if (option.full.startsWith("https://")) get(option.full) else runCatching { File(option.full).readBytes() }.getOrNull()
+        bytes ?: return false
+        val ext = option.full.substringAfterLast('.', "png").substringBefore('?').lowercase().takeIf { it in CHOOSABLE + "ico" } ?: "png"
+        val cache = cacheDir(context, game).apply { mkdirs() }
+        chosen(cache, slot)?.delete()
+        val dst = File(cache, "chosen-${slot.key}.${if (ext == "jpeg") "jpg" else ext}")
+        val tmp = File(cache, dst.name + ".tmp")
+        tmp.writeBytes(bytes)
+        if (!tmp.renameTo(dst)) return false
+        SessionPrefs.setAddedGameArtSource(context, game.folder.path, slot.key, option.group + "|" + option.full)
+        return true
+    }
+
+    /** Where the user's choice for [slot] came from and which image it was ("" both when automatic). */
+    fun chosenSource(context: Context, game: AddedGames.Game, slot: Slot): Pair<String, String> {
+        val value = SessionPrefs.addedGameArtSource(context, game.folder.path, slot.key)
+        return value.substringBefore('|') to value.substringAfter('|', "")
+    }
+
+    /** [slot] back to what is found by itself. */
+    fun reset(context: Context, game: AddedGames.Game, slot: Slot) {
+        chosen(cacheDir(context, game), slot)?.delete()
+        SessionPrefs.setAddedGameArtSource(context, game.folder.path, slot.key, "")
+    }
+
+    private fun exists(url: String): Boolean = runCatching {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.requestMethod = "HEAD"
+        c.connectTimeout = 8_000
+        c.readTimeout = 8_000
+        c.setRequestProperty("User-Agent", "DroidDeck-launcher")
+        try { c.responseCode == 200 } finally { c.disconnect() }
+    }.getOrDefault(false)
 
     /** The first icon inside the game's .exe, kept as a PNG beside the cached art. */
     private fun exeIcon(context: Context, game: AddedGames.Game): File? {
@@ -188,7 +307,7 @@ object AddedGameArt {
             val bytes = get("$CDN$id/$remote") ?: continue
             val tmp = File(cache, "$localName.tmp")
             tmp.writeBytes(bytes)
-            if (tmp.renameTo(dst)) got = true
+            if (tmp.renameTo(dst)) { got = true; File(cache, "$localName.src").writeText(STEAM) }
         }
         return got
     }

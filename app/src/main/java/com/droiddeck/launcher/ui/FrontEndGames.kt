@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Add
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.droiddeck.launcher.frontend.Library
+import kotlinx.coroutines.launch
 
 // The Games page: the list, the hero for the selected game and its labels.
 
@@ -70,9 +72,9 @@ internal fun GamesPage(s: FrontEndState, a: FrontEndActions, selected: String, o
     val games = remember(s.steamGames) { s.steamGames.sortedByDescending { it.lastPlayed } }
     val narrow = LocalNarrowPane.current
     val current = games.firstOrNull { "app:${it.appId}" == selected } ?: games.firstOrNull()
-    var adding by remember { androidx.compose.runtime.mutableStateOf(false) }
-    if (adding) ExePickerDialog(stringResource(R.string.games_add_title), onPick = { a.onAddGameExe(it.path) }, onDismiss = { adding = false })
-    val onAdd: (() -> Unit)? = if (s.shortcutPicker) null else ({ adding = true })
+    GamesDialogs(a)
+    val onAdd: (() -> Unit)? = if (s.shortcutPicker) null else ({ GamesDialogState.adding = true })
+    val onEdit: (Library.SteamGame) -> Unit = { g -> g.gameFiles?.let { GamesDialogState.editing = EditRequest(it.path, openTarget = false, fromSummary = false) } }
     if (current == null) {
         Column(modifier = modifier.padding(horizontal = if (narrow) 16.dp else 22.dp, vertical = if (narrow) 12.dp else 18.dp)) {
             Rise(0) { PageHeader(stringResource(R.string.content_games)) { onAdd?.let { AddGameButton(it) } } }
@@ -92,7 +94,7 @@ internal fun GamesPage(s: FrontEndState, a: FrontEndActions, selected: String, o
                 Row(verticalAlignment = Alignment.Bottom) {
                     GameHero(current, Modifier.weight(1f).heightIn(min = if (narrow) 190.dp else 250.dp)) {
                         GameHeroCopy(current, if (narrow) 28.sp else 38.sp)
-                        GameActions(current, s, a)
+                        GameActions(current, s, a, onEdit)
                     }
                     if (!narrow) Poster(current.art, current.name, Modifier.width(168.dp))
                 }
@@ -114,7 +116,7 @@ internal fun GamesPage(s: FrontEndState, a: FrontEndActions, selected: String, o
         ) {
             GameHero(current, Modifier.fillMaxWidth().heightIn(min = if (narrow) 170.dp else 200.dp)) {
                 GameHeroCopy(current, if (narrow) 24.sp else 32.sp)
-                GameActions(current, s, a)
+                GameActions(current, s, a, onEdit)
             }
             SectionTitle(stringResource(R.string.games_launch_settings), null)
             LaunchSettings(s, a, host, current)
@@ -142,7 +144,7 @@ private fun GameFileFolderActions(s: FrontEndState, a: FrontEndActions) {
 
 
 @Composable
-private fun GameActions(g: Library.SteamGame, s: FrontEndState, a: FrontEndActions) {
+private fun GameActions(g: Library.SteamGame, s: FrontEndState, a: FrontEndActions, onEdit: (Library.SteamGame) -> Unit) {
     Actions {
         PrimaryButton(stringResource(if (s.shortcutPicker) R.string.game_shortcut_choose else R.string.games_launch), enabled = !s.busy, main = true, icon = Icons.Filled.PlayArrow) { a.onSteamGame(g) }
         g.gameFiles?.takeIf { it.isDirectory }?.let { dir ->
@@ -154,6 +156,8 @@ private fun GameActions(g: Library.SteamGame, s: FrontEndState, a: FrontEndActio
             if (g.library == Library.ADDED) ManageSaves(g, dir, a)
         }
         if (!s.shortcutPicker) GameShortcutMenu(g, a)
+        // A game added in DroidDeck (Custom): its editor, Steam's Properties for a non-Steam game.
+        if (!s.shortcutPicker && g.library == Library.ADDED && g.source == Library.ADDED && g.gameFiles != null) EditGameButton { onEdit(g) }
         BusyChip(s)
     }
 }
@@ -329,6 +333,74 @@ private fun GamesHeader(count: Int, onAdd: (() -> Unit)?, modifier: Modifier) {
         Text(stringResource(R.string.content_games), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = colors.onBackground, maxLines = 1)
         Text(count.toString(), fontSize = 13.sp, color = colors.onSurfaceVariant)
         if (onAdd != null) AddGameButton(onAdd)
+    }
+}
+
+/**
+ * The Games tab's dialogs, one at a time: the + picker, the summary after "Add all games in this
+ * folder", and a game's editor (from the page's ✎ or a summary row, with back to the summary).
+ */
+internal object GamesDialogState {
+    var adding by androidx.compose.runtime.mutableStateOf(false)
+    var summary by androidx.compose.runtime.mutableStateOf<Pair<List<String>, Int>?>(null)
+    var editing by androidx.compose.runtime.mutableStateOf<EditRequest?>(null)
+    /** The summary an editor opened from it goes back to. */
+    var behindEditor: Pair<List<String>, Int>? = null
+}
+
+@Composable
+private fun GamesDialogs(a: FrontEndActions) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val st = GamesDialogState
+    if (st.adding) ExePickerDialog(
+        stringResource(R.string.games_add_title),
+        onAddAll = { dir ->
+            scope.launch {
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.droiddeck.launcher.frontend.AddedGames.addFolder(ctx.applicationContext, dir)
+                }
+                a.onAddedGamesChanged()
+                st.summary = result.added.map { it.folder.path } to result.already
+            }
+        },
+        onPick = { a.onAddGameExe(it.path) },
+        onDismiss = { st.adding = false },
+    )
+    st.summary?.let { (folders, already) ->
+        AddedGamesSummaryDialog(folders, already, onOpen = { folder, uncertain ->
+            st.behindEditor = folders to already
+            st.editing = EditRequest(folder, openTarget = uncertain, fromSummary = true)
+        }, onDismiss = { st.summary = null })
+    }
+    st.editing?.let { request ->
+        AddedGameEditor(
+            request,
+            onBack = { st.behindEditor?.let { st.summary = it }; st.behindEditor = null },
+            onClose = { st.editing = null },
+            onChanged = { a.onAddedGamesChanged() },
+        )
+    }
+}
+
+/** The ✎ on a Custom game's page: icon only. */
+@Composable
+private fun EditGameButton(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val pal = LocalPalette.current
+    val src = remember { MutableInteractionSource() }
+    val hot = rememberHot(src)
+    val label = stringResource(R.string.common_edit)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.paneItem("game:edit").size(40.dp).clip(Shape12)
+            .background(if (hot) pal.signal.copy(alpha = 0.18f) else colors.surface.copy(alpha = 0.55f))
+            .glideBorder(hot, Shape12, pal.signal, pal.line2)
+            .hoverable(src).clickable(interactionSource = src, indication = LocalIndication.current, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .controllerConfirm(onClick = onClick)
+            .semantics { contentDescription = label },
+    ) {
+        androidx.compose.material3.Icon(Icons.Outlined.Edit, contentDescription = null, tint = colors.onBackground, modifier = Modifier.size(18.dp))
     }
 }
 
