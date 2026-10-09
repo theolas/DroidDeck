@@ -46,7 +46,7 @@ object GameExePicker {
 
     /** Ranks the .exe files under [folder]; [keep] drops names the caller never offers. */
     fun rank(folder: File, keep: (File) -> Boolean = { true }): Ranking {
-        val scored = collect(folder).filter(keep).map { (exe, depth) -> exe to score(exe, folder, depth) }
+        val scored = collect(folder).filter { keep(it.first) }.map { (exe, depth) -> exe to score(exe, folder, depth) }
             .sortedWith(compareByDescending<Pair<File, Int>> { it.second }.thenBy { it.first.path.lowercase() })
         val best = scored.firstOrNull()?.second
         val runnerUp = scored.getOrNull(1)?.second
