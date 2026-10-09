@@ -639,13 +639,6 @@ object SessionPrefs {
         }
     }
 
-    /** The folder the Games tab's + picker last picked an .exe in; "" before the first pick. */
-    fun lastExePickDir(context: Context): String = prefs(context).getString("lastExePickDir", "") ?: ""
-
-    fun setLastExePickDir(context: Context, dir: String) {
-        prefs(context).edit().putString("lastExePickDir", dir).apply()
-    }
-
     /** Whether added games without art of their own get Steam's store art fetched for them. */
     fun addedGamesArt(context: Context): Boolean = prefs(context).getBoolean("addedGamesArt", true)
 

@@ -315,6 +315,8 @@
     <string name="mode_added_remove_confirm">제거?</string>
     <string name="mode_added_removed">제거한 게임 (%1$d)</string>
     <string name="games_add">게임 추가</string>
+    <string name="games_add_title">게임 추가:</string>
+    <string name="games_pick_exe_title">exe 선택:</string>
     <string name="games_add_unreachable">이 위치는 세션에서 사용할 수 없습니다</string>
     <string name="mode_added_exe_check">이 exe 확인</string>
     <string name="mode_added_exe_note">기본적으로 폴더와 이름이 같은 .exe를 사용하고, 없으면 가장 큰 .exe를 사용합니다.</string>
@@ -1133,7 +1135,6 @@
     <string name="main_forgetting_named">%1$s 잊는 중…</string>
     <string name="main_pick_game_storage">게임 저장 폴더 선택</string>
     <string name="main_pick_added_games">내 게임이 있는 폴더 선택</string>
-    <string name="main_pick_game_exe">게임의 .exe 선택</string>
     <string name="main_pick_decky_zip">Decky 플러그인 ZIP 선택</string>
     <string name="main_storage_not_usable">사용할 수 없음: %1$s</string>
 

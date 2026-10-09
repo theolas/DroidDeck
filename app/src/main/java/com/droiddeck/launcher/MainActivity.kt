@@ -310,22 +310,9 @@ class MainActivity : ComponentActivity() {
             refresh()
         }
     }
-    private var pendingAddedGame: String? = null
-    private val pickAddedGameExe = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        val folder = pendingAddedGame ?: return@registerForActivityResult
-        pendingAddedGame = null
-        if (r.resultCode == RESULT_OK) InAppFilePicker.pickedPath(r.data)?.let { path ->
-            SessionPrefs.setAddedGameExe(this, folder, path)
-            refreshAddedGames()
-            refresh()
-        }
-    }
     /** The Games tab's +: the picked .exe becomes a game (or selects / switches the one it belongs to). */
-    private val pickNewGameExe = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        if (r.resultCode != RESULT_OK) return@registerForActivityResult
-        val path = InAppFilePicker.pickedPath(r.data) ?: return@registerForActivityResult
+    private fun addGameExe(path: String) {
         val exe = java.io.File(path)
-        exe.parentFile?.let { SessionPrefs.setLastExePickDir(this, it.path) }
         Thread({
             val result = try { com.droiddeck.launcher.frontend.AddedGames.addExe(this, exe) } catch (e: Exception) {
                 Log.w(TAG, "add game: ${e.message}"); com.droiddeck.launcher.frontend.AddedGames.AddResult.NotFound
@@ -347,13 +334,6 @@ class MainActivity : ComponentActivity() {
                 navRequest = "app:${game.steamAppId ?: game.appId.toInt()}"
             }
         }, "add-game-exe").start()
-    }
-
-    private fun pickNewGame() {
-        val start = SessionPrefs.lastExePickDir(this).takeIf { java.io.File(it).isDirectory }
-            ?: addedGamesDirs.firstOrNull { java.io.File(it).isDirectory }
-            ?: android.os.Environment.getExternalStorageDirectory().path
-        pickNewGameExe.launch(InAppFilePicker.buildIntent(this, listOf("exe"), getString(R.string.main_pick_game_exe), start))
     }
     private var addedGamesDirs by mutableStateOf<List<String>>(emptyList())
     private var addedGamesArt by mutableStateOf(true)
@@ -646,7 +626,7 @@ class MainActivity : ComponentActivity() {
                         onGameShortcut = { g -> com.droiddeck.launcher.frontend.GameShortcuts.pin(this, g) },
                         onExportGameFile = { g -> pickGameExport(g) },
                         onSyncGameFiles = { pickGameExport(null) },
-                        onAddGameExe = { pickNewGame() },
+                        onAddGameExe = { path -> addGameExe(path) },
                         onStopGameFileSync = {
                             Thread({
                                 GameFileSync.disable(this)
@@ -1390,10 +1370,6 @@ class MainActivity : ComponentActivity() {
                 onAddedGameExe = { folder, path -> SessionPrefs.setAddedGameExe(this, folder, path); refreshAddedGames(); refresh() },
                 onRemoveAddedGame = { folder -> changeAddedGame { com.droiddeck.launcher.frontend.AddedGames.remove(this, java.io.File(folder)) } },
                 onRestoreAddedGame = { folder -> changeAddedGame { com.droiddeck.launcher.frontend.AddedGames.restore(this, java.io.File(folder)) } },
-                onPickAddedGameExe = { folder ->
-                    pendingAddedGame = folder
-                    pickAddedGameExe.launch(InAppFilePicker.buildIntent(this, listOf("exe"), getString(R.string.main_pick_game_exe), folder))
-                },
                 onDeckyInstall = { release -> decky.installDecky(release) },
                 onDeckyCheck = { decky.refreshDecky() },
                 onDeckyEnabled = { enabled -> DeckyManager.setSupervisorEnabled(this, enabled); decky.deckySupervisor = enabled },
