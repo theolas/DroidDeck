@@ -58,7 +58,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -520,35 +520,47 @@ fun <T> MenuRow(host: MenuHost, key: String, label: String, button: String, opti
 }
 
 /**
- * A trash-can button that asks twice: the first press turns it red with "Remove?", a second within
- * four seconds calls [onRemove]; otherwise it turns back. [description] names what it removes.
+ * A red X that asks twice: the first press fills it red with "Remove?", a second within four
+ * seconds calls [onRemove]; otherwise it turns back. [description] names what it removes.
  */
 @Composable
 fun RemoveButton(description: String, onRemove: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    val pal = LocalPalette.current
     var armed by remember { mutableStateOf(false) }
     LaunchedEffect(armed) { if (armed) { kotlinx.coroutines.delay(4_000); armed = false } }
     val src = remember { MutableInteractionSource() }
     val hot = src.collectIsFocusedAsState().value || src.collectIsHoveredAsState().value
     val press = { if (armed) { armed = false; onRemove() } else armed = true }
-    val tint = if (armed) colors.error else if (hot) colors.onBackground else colors.onSurfaceVariant
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(99.dp)
     val confirm = stringResource(R.string.mode_added_remove_confirm)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .heightIn(min = 40.dp).widthIn(min = 40.dp)
             .clip(shape)
-            .glideBorder(hot, shape, if (armed) colors.error else pal.signal)
+            .background(if (armed) colors.error else Color.Transparent)
+            .glideBorder(hot, shape, colors.error)
             .hoverable(src)
             .clickable(interactionSource = src, indication = LocalIndication.current, role = Role.Button, onClick = press)
             .controllerConfirm(onClick = press)
             .semantics { contentDescription = if (armed) "$description: $confirm" else description }
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 10.dp),
     ) {
-        Icon(Icons.Outlined.Delete, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-        if (armed) Text(confirm, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.error, modifier = Modifier.padding(start = 4.dp))
+        Icon(Icons.Filled.Close, contentDescription = null, tint = if (armed) colors.onError else colors.error, modifier = Modifier.size(20.dp))
+        if (armed) Text(confirm, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.onError, modifier = Modifier.padding(start = 4.dp))
+    }
+}
+
+/** A small "?" beside a value the app guessed and is not sure of; [description] says what to check. */
+@Composable
+fun UncertainMark(description: String) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(22.dp).clip(CircleShape).background(colors.surfaceVariant)
+            .semantics { contentDescription = description },
+    ) {
+        Text("?", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.onSurfaceVariant)
     }
 }
 

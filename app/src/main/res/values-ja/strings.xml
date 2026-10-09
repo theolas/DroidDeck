@@ -311,6 +311,7 @@
     <string name="mode_added_remove">%1$s を削除</string>
     <string name="mode_added_remove_confirm">削除？</string>
     <string name="mode_added_removed">削除したゲーム（%1$d）</string>
+    <string name="mode_added_exe_check">この exe を確認</string>
     <string name="mode_added_exe_note">デフォルトではフォルダと同じ名前の.exeを使用し、ない場合は最大の.exeを使用します。</string>
     <string name="wincomp_title">Windowsコンポーネント</string>
     <string name="wincomp_pad_hint">LB / RBでセクション間を移動します。</string>

@@ -281,6 +281,7 @@
     <string name="mode_added_remove">Retirer %1$s</string>
     <string name="mode_added_remove_confirm">Retirer ?</string>
     <string name="mode_added_removed">Jeux retirés (%1$d)</string>
+    <string name="mode_added_exe_check">Vérifier cet exécutable</string>
     <string name="mode_added_exe_note">Utilise par défaut le .exe portant le même nom que le dossier, sinon le .exe le plus volumineux.</string>
     <string name="mode_stretch169">Étirer les jeux 16:9</string>
     <string name="mode_stretch169_hint">Sur les écrans dont le rapport d\'aspect est inférieur à 16:9, étire le jeu pour remplir l\'écran au lieu d\'afficher des bandes noires. Prendra effet à la prochaine session.</string>
