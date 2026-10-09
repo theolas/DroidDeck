@@ -58,6 +58,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -476,21 +477,78 @@ fun <T> ChoiceRow(
     chipModifier: Modifier = Modifier,
     /** See SettingsRow: a fixed height for a hint that changes with the choice. */
     hintLines: Int? = null,
+    /** A control to the right of the box (a row's remove button). */
+    trailing: (@Composable () -> Unit)? = null,
     onPick: (T) -> Unit,
 ) {
     val open = host.open == key
     SettingsRow(label, hint, highlighted = open, hintLines = hintLines) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box {
+                ValueChip(options.firstOrNull { it.first == selected }?.second ?: "-", open, enabled, modifier = chipModifier.testTag("setting-$key")) { host.open = if (open) null else key }
+                AnchoredMenu(open, onDismiss = { if (host.open == key) host.open = null }, title = label, note = note) { firstItemFocus ->
+                    options.forEachIndexed { index, (value, text) ->
+                        MenuItem(text, checked = value == selected, focusRequester = if (index == 0) firstItemFocus else null) {
+                            onPick(value)
+                            host.open = null
+                        }
+                    }
+                }
+            }
+            trailing?.invoke()
+        }
+    }
+}
+
+/** A row whose box ([button]) opens a menu of [options]; picking one calls [onPick]. Nothing is "selected". */
+@Composable
+fun <T> MenuRow(host: MenuHost, key: String, label: String, button: String, options: List<Pair<T, String>>, onPick: (T) -> Unit) {
+    val open = host.open == key
+    SettingsRow(label, null, highlighted = open) {
         Box {
-            ValueChip(options.firstOrNull { it.first == selected }?.second ?: "-", open, enabled, modifier = chipModifier.testTag("setting-$key")) { host.open = if (open) null else key }
-            AnchoredMenu(open, onDismiss = { if (host.open == key) host.open = null }, title = label, note = note) { firstItemFocus ->
+            ValueChip(button, open, modifier = Modifier.testTag("setting-$key")) { host.open = if (open) null else key }
+            AnchoredMenu(open, onDismiss = { if (host.open == key) host.open = null }, title = label) { firstItemFocus ->
                 options.forEachIndexed { index, (value, text) ->
-                    MenuItem(text, checked = value == selected, focusRequester = if (index == 0) firstItemFocus else null) {
-                        onPick(value)
+                    MenuItem(text, checked = false, focusRequester = if (index == 0) firstItemFocus else null) {
                         host.open = null
+                        onPick(value)
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * A trash-can button that asks twice: the first press turns it red with "Remove?", a second within
+ * four seconds calls [onRemove]; otherwise it turns back. [description] names what it removes.
+ */
+@Composable
+fun RemoveButton(description: String, onRemove: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val pal = LocalPalette.current
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(armed) { if (armed) { kotlinx.coroutines.delay(4_000); armed = false } }
+    val src = remember { MutableInteractionSource() }
+    val hot = src.collectIsFocusedAsState().value || src.collectIsHoveredAsState().value
+    val press = { if (armed) { armed = false; onRemove() } else armed = true }
+    val tint = if (armed) colors.error else if (hot) colors.onBackground else colors.onSurfaceVariant
+    val shape = RoundedCornerShape(10.dp)
+    val confirm = stringResource(R.string.mode_added_remove_confirm)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .heightIn(min = 40.dp).widthIn(min = 40.dp)
+            .clip(shape)
+            .glideBorder(hot, shape, if (armed) colors.error else pal.signal)
+            .hoverable(src)
+            .clickable(interactionSource = src, indication = LocalIndication.current, role = Role.Button, onClick = press)
+            .controllerConfirm(onClick = press)
+            .semantics { contentDescription = if (armed) "$description: $confirm" else description }
+            .padding(horizontal = 8.dp),
+    ) {
+        Icon(Icons.Outlined.Delete, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        if (armed) Text(confirm, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = colors.error, modifier = Modifier.padding(start = 4.dp))
     }
 }
 

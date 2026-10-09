@@ -308,6 +308,9 @@
     <string name="mode_added_launches">%1$s 실행</string>
     <string name="mode_added_launches_in">%1$s 실행 · %2$s에 위치</string>
     <string name="mode_added_choose">다른 파일 선택…</string>
+    <string name="mode_added_remove">%1$s 제거</string>
+    <string name="mode_added_remove_confirm">제거?</string>
+    <string name="mode_added_removed">제거한 게임 (%1$d)</string>
     <string name="mode_added_exe_note">기본적으로 폴더와 이름이 같은 .exe를 사용하고, 없으면 가장 큰 .exe를 사용합니다.</string>
     <string name="wincomp_title">Windows 구성 요소</string>
     <string name="wincomp_pad_hint">LB / RB로 섹션 사이를 이동합니다.</string>

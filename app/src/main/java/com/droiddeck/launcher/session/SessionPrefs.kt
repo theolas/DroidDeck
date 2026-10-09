@@ -625,6 +625,20 @@ object SessionPrefs {
         prefs(context).edit().putString("addedGamesDirs", dirs.distinct().joinToString("\n")).remove("addedGamesDir").apply()
     }
 
+    /**
+     * Game folders (by path) the user removed from the added games: a scan skips them, so they
+     * stay off the Games tab and out of Steam until restored. Nothing on disk is touched.
+     */
+    fun removedAddedGames(context: Context): List<String> =
+        (prefs(context).getString("removedAddedGames", "") ?: "").split('\n').filter { it.isNotEmpty() }
+
+    fun setAddedGameRemoved(context: Context, folderPath: String, removed: Boolean) {
+        synchronized(addedGameLock) {
+            val now = removedAddedGames(context).filter { it != folderPath } + listOfNotNull(folderPath.takeIf { removed })
+            prefs(context).edit().putString("removedAddedGames", now.joinToString("\n")).apply()
+        }
+    }
+
     /** Whether added games without art of their own get Steam's store art fetched for them. */
     fun addedGamesArt(context: Context): Boolean = prefs(context).getBoolean("addedGamesArt", true)
 

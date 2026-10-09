@@ -308,6 +308,9 @@
     <string name="mode_added_launches">啟動 %1$s</string>
     <string name="mode_added_launches_in">啟動 %1$s · 位於 %2$s</string>
     <string name="mode_added_choose">選擇其他檔案…</string>
+    <string name="mode_added_remove">移除 %1$s</string>
+    <string name="mode_added_remove_confirm">移除？</string>
+    <string name="mode_added_removed">已移除的遊戲（%1$d）</string>
     <string name="mode_added_exe_note">預設使用與資料夾同名的 .exe，否則使用最大的 .exe。</string>
     <string name="wincomp_title">Windows 元件</string>
     <string name="wincomp_pad_hint">按 LB / RB 在各區段之間切換。</string>
